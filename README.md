@@ -1,7 +1,5 @@
 # Traffic Sign Recognition
 
----
-
 This is a NUS SoC Summer Workshop 2024 Visual Computing Project worked on by Group 10.
 
 Traffic-sign recognition (TSR) is a technology by which a vehicle is able to recognize traffic signs on the road e.g. "speed limit" or "children" or "turn ahead". This is a very important technology in self-driving cars.
@@ -26,7 +24,6 @@ Traffic Sign Recognition is a crucial component of autonomous driving systems. T
 ## Installation
 
 1. Clone the repository:
-2. 
 ```shell
 git clone https://github.com/Sen-Yao/traffic-sign-recognition.git
 cd traffic-sign-recognition  
@@ -63,7 +60,6 @@ Extract the HOG feature and use SVM as the classifier.
 
 Example command:
 
-Example:
 
 ```CLI
 python main.py --dataset_name CTSD --feature_extractor hog --classifier svm
