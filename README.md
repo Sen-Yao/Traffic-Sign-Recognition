@@ -67,7 +67,7 @@ python main.py --dataset_name CTSD --feature_extractor hog --classifier svm
 
 ## Bonus Level
 
-To be finished.
+For the Bonus level, use the German Traffic Sign Recognition Benchmark (GTSRB) from here[https://benchmark.ini.rub.de/]. Place the Train, Test, Meta folder and files in the Dataset/GTSRB directory.
 
 ## Authors
 
@@ -80,6 +80,8 @@ To be finished.
 
 Download the Chinese Traffic Sign Database from here[https://nlpr.ia.ac.cn/pal/trafficdata/recognition.html]. Ensure the images are placed in the Dataset/CTSD directory as required.
 
+Download the German Traffic Sign Recognition Benchmark (GTSRB) from here[https://benchmark.ini.rub.de/]. Ensure the images are placed in the Dataset/GTSRB directory as required.
+
 ## Dependencies
 
 List of dependencies can be found in the requirements.txt file. Some key dependencies include:
@@ -88,6 +90,7 @@ List of dependencies can be found in the requirements.txt file. Some key depende
 - Scikit-learn 
 - Scikit-image 
 - NumPy
+- tqdm
 
 Install all dependencies using:
 

@@ -2,10 +2,11 @@
 import argparse
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
 
 from data_reader import read_ctsd_dataset, read_gtsrb_dataset
-from extractor import extract_hog_features
+from extractor import extract_hog_features, extract_gist_features
 
 
 def main():
@@ -14,7 +15,7 @@ def main():
     # Change the dataset_path to point to the unzipped Dataset_1/images folder in your computer.
     parser.add_argument('--dataset_path', type=str, default='Dataset', help='Path to the dataset')
     parser.add_argument('--dataset_name', type=str, default='GTSRB',  help='Name of the dataset')
-    parser.add_argument('--feature_extractor', type=str, default='hog', help='Feature extraction method (default: hog)')
+    parser.add_argument('--feature_extractor', type=str, default='GIST', help='Feature extraction method (default: hog)')
     parser.add_argument('--classifier', type=str, default='svm', help='Classifier to use (default: svm)')
 
     args = parser.parse_args()
@@ -39,13 +40,20 @@ def main():
     else:
         raise ValueError(f"Unsupported dataset: {args.dataset_name}")
 
-    if args.feature_extractor == 'hog':
-        print("Extracting hog features...")
+    if args.feature_extractor == 'HOG':
+        print("Extracting HOG features...")
         if done_train_test_split:
             X_train = extract_hog_features(X_train)
             X_test = extract_hog_features(X_test)
         else:
             X = extract_hog_features(X)
+    elif args.feature_extractor == 'GIST':
+        print("Extracting GIST features...")
+        if done_train_test_split:
+            X_train = extract_gist_features(X_train)
+            X_test = extract_gist_features(X_test)
+        else:
+            X = extract_gist_features(X)
     else:
         raise ValueError(f"Unsupported feature extractor: {args.feature_extractor}")
 
@@ -55,9 +63,13 @@ def main():
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
     # Use the sklearn SVM package to train a classifier using x_train and y_train.
+    # 选择并训练分类器
     if args.classifier == 'svm':
         clf = SVC(kernel='linear')
         print("Training SVM classifier...")
+    elif args.classifier == 'knn':
+        clf = KNeighborsClassifier(n_neighbors=5)
+        print("Training KNN classifier with k =", 5)
     else:
         raise ValueError(f"Unsupported classifier: {args.classifier}")
 
