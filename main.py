@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score
 
-from data_reader import read_ctsd_dataset
+from data_reader import read_ctsd_dataset, read_gtsrb_dataset
 from extractor import extract_hog_features
 
 
@@ -13,27 +13,46 @@ def main():
 
     # Change the dataset_path to point to the unzipped Dataset_1/images folder in your computer.
     parser.add_argument('--dataset_path', type=str, default='Dataset', help='Path to the dataset')
-    parser.add_argument('--dataset_name', type=str, default='CTSD',  help='Name of the dataset')
+    parser.add_argument('--dataset_name', type=str, default='GTSRB',  help='Name of the dataset')
     parser.add_argument('--feature_extractor', type=str, default='hog', help='Feature extraction method (default: hog)')
     parser.add_argument('--classifier', type=str, default='svm', help='Classifier to use (default: svm)')
 
     args = parser.parse_args()
 
+    X = []
+    y = []
+    X_train = []
+    X_test = []
+    y_train = []
+    y_test = []
+
+    # Train set and Test set have been split?
+    done_train_test_split = False
+
     if args.dataset_name == 'CTSD':
         print("Reading CTSD Dataset...")
         X, y = read_ctsd_dataset(args.dataset_path, args.dataset_name)
+    elif args.dataset_name == 'GTSRB':
+        print("Reading GTSRB Dataset...")
+        done_train_test_split = True
+        X_train, X_test, y_train, y_test = read_gtsrb_dataset(args.dataset_path, args.dataset_name)
     else:
         raise ValueError(f"Unsupported dataset: {args.dataset_name}")
 
     if args.feature_extractor == 'hog':
         print("Extracting hog features...")
-        X_features = extract_hog_features(X)
+        if done_train_test_split:
+            X_train = extract_hog_features(X_train)
+            X_test = extract_hog_features(X_test)
+        else:
+            X = extract_hog_features(X)
     else:
         raise ValueError(f"Unsupported feature extractor: {args.feature_extractor}")
 
-    # split X_features and y into training and testing sets
-    # Use a 80-20 split and make sure to shuffle the samples.
-    X_train, X_test, y_train, y_test = train_test_split(X_features, y, test_size=0.2, random_state=42, shuffle=True)
+    if not done_train_test_split:
+        # split X_features and y into training and testing sets
+        # Use a 80-20 split and make sure to shuffle the samples.
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
     # Use the sklearn SVM package to train a classifier using x_train and y_train.
     if args.classifier == 'svm':
