@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from scipy.fftpack import fft2, ifft2, fftshift
 from tqdm import tqdm
 from skimage.feature import hog
 from skimage.filters import gabor_kernel
@@ -28,8 +29,15 @@ def extract_hog_features(X, orientations=8, pixels_per_cell=(10, 10), cells_per_
     return X_features
 
 
-def extract_gist_features(X, orientations=8, pixels_per_cell=(10, 10), cells_per_block=(1, 1), image_size=(64, 64),
-                          num_blocks=4):
+def compute_power_spectrum(image):
+    # Convert image to float32 and compute the power spectrum in the Fourier domain
+    f = np.fft.fft2(image)
+    fshift = np.fft.fftshift(f)
+    power_spectrum = np.abs(fshift)**2
+    return power_spectrum
+
+
+def extract_gist_features(X, orientations=8, image_size=(64, 64), num_blocks=4):
     X_features = []
 
     # Define Gabor filters

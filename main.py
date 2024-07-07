@@ -1,5 +1,6 @@
 # main.py
 import argparse
+import time
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
@@ -72,9 +73,11 @@ def main():
         print("Training KNN classifier with k =", 5)
     else:
         raise ValueError(f"Unsupported classifier: {args.classifier}")
-
+    t1 = time.time()
+    print("Training start at", time.ctime(t1))
     clf.fit(X_train, y_train)
-
+    print("Training time =", time.time()-t1)
+    print("Predicting...")
     # Use the x_test and y_test to evaluate the classifier and print the accuracy value.
     y_pred = clf.predict(X_test)
     accuracy = accuracy_score(y_test, y_pred)
