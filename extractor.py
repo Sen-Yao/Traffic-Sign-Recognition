@@ -53,26 +53,38 @@ def extract_gist_features(X, orientations=8, image_size=(64, 64), num_blocks=4):
             filtered_images.append(filtered)
         return filtered_images
 
+    def extract_gist_descriptor(img, filters, num_blocks):
+        gabor_responses = apply_gabor_filters(img, filters)
+        height, width = img.shape
+        block_size = (height // num_blocks, width // num_blocks)
+        gist_descriptor = []
+        for gabor_img in gabor_responses:
+            for i in range(num_blocks):
+                for j in range(num_blocks):
+                    block = gabor_img[i * block_size[0]:(i + 1) * block_size[0], j * block_size[1]:(j + 1) * block_size[1]]
+                    gist_descriptor.append(block.mean())
+        return gist_descriptor
+
     for x in tqdm(X, desc="Extracting GIST features"):
         # Resize images to the specified size
         temp_x = cv2.resize(x, image_size)
         # Convert the images to grayscale
         temp_x = cv2.cvtColor(temp_x, cv2.COLOR_BGR2GRAY)
 
-        # Apply Gabor filters
-        gabor_responses = apply_gabor_filters(temp_x, gabor_filters)
+        # Generate outer BB by removing 5 pixels
+        outer_bb = temp_x[5:-5, 5:-5]
+        outer_bb = cv2.resize(outer_bb, image_size)
 
-        # Divide the image into blocks and compute the mean response in each block
-        height, width = temp_x.shape
-        block_size = (height // num_blocks, width // num_blocks)
-        gist_descriptor = []
+        # Generate inner BB by removing additional 10 pixels
+        inner_bb = outer_bb[10:-10, 10:-10]
+        inner_bb = cv2.resize(inner_bb, image_size)
 
-        for gabor_img in gabor_responses:
-            for i in range(num_blocks):
-                for j in range(num_blocks):
-                    block = gabor_img[i * block_size[0]:(i + 1) * block_size[0],
-                            j * block_size[1]:(j + 1) * block_size[1]]
-                    gist_descriptor.append(block.mean())
+        # Extract GIST descriptors for both BBs
+        gist_outer = extract_gist_descriptor(outer_bb, gabor_filters, num_blocks)
+        gist_inner = extract_gist_descriptor(inner_bb, gabor_filters, num_blocks)
+
+        # Concatenate the GIST descriptors to form the final feature vector
+        gist_descriptor = gist_outer + gist_inner
 
         X_features.append(gist_descriptor)
 
