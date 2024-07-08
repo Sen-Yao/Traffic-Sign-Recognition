@@ -58,6 +58,7 @@ def extract_gist_features(X, orientations=8, image_size=(64, 64), num_blocks=4):
         return filtered_images
 
     def extract_gist_descriptor(img, filters, num_blocks):
+
         gabor_responses = apply_gabor_filters(img, filters)
         height, width = img.shape
         block_size = (height // num_blocks, width // num_blocks)
