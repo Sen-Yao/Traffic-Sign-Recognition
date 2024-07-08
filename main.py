@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
+from sklearn.decomposition import PCA
 
 from data_reader import read_ctsd_dataset, read_gtsrb_dataset
 from extractor import extract_hog_features, extract_gist_features
@@ -49,6 +50,18 @@ def main():
         else:
             X = extract_hog_features(X)
     elif args.feature_extractor == 'GIST':
+        print("Extracting GIST features...")
+        if done_train_test_split:
+            pca = PCA(n_components=512)
+            X_train = extract_gist_features(X_train)
+            X_train = pca.fit_transform(X_train)
+            print("PCA1")
+            X_test = extract_gist_features(X_test)
+            X_test = pca.transform(X_test)
+            print("PCA2")
+        else:
+            X = extract_gist_features(X)
+    elif args.feature_extractor == 'HOG+GIST':
         print("Extracting GIST features...")
         if done_train_test_split:
             X_train = extract_gist_features(X_train)

@@ -4,6 +4,8 @@ from scipy.fftpack import fft2, ifft2, fftshift
 from tqdm import tqdm
 from skimage.feature import hog
 from skimage.filters import gabor_kernel
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 
 def extract_hog_features(X, orientations=8, pixels_per_cell=(10, 10), cells_per_block=(1, 1)):
@@ -87,5 +89,4 @@ def extract_gist_features(X, orientations=8, image_size=(64, 64), num_blocks=4):
         gist_descriptor = gist_outer + gist_inner
 
         X_features.append(gist_descriptor)
-
     return np.array(X_features)
