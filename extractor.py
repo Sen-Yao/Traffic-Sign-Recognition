@@ -63,30 +63,38 @@ def extract_gist_features(X, orientations=8, image_size=(64, 64), num_blocks=4):
         for gabor_img in gabor_responses:
             for i in range(num_blocks):
                 for j in range(num_blocks):
-                    block = gabor_img[i * block_size[0]:(i + 1) * block_size[0], j * block_size[1]:(j + 1) * block_size[1]]
+                    block = gabor_img[i * block_size[0]:(i + 1) * block_size[0],
+                            j * block_size[1]:(j + 1) * block_size[1]]
                     gist_descriptor.append(block.mean())
         return gist_descriptor
 
     for x in tqdm(X, desc="Extracting GIST features"):
         # Resize images to the specified size
         temp_x = cv2.resize(x, image_size)
-        # Convert the images to grayscale
-        temp_x = cv2.cvtColor(temp_x, cv2.COLOR_BGR2GRAY)
 
-        # Generate outer BB by removing 5 pixels
-        outer_bb = temp_x[5:-5, 5:-5]
-        outer_bb = cv2.resize(outer_bb, image_size)
+        # Initialize a list to hold GIST descriptors for all channels
+        gist_descriptor = []
 
-        # Generate inner BB by removing additional 10 pixels
-        inner_bb = outer_bb[10:-10, 10:-10]
-        inner_bb = cv2.resize(inner_bb, image_size)
+        # Process each channel separately
+        for channel in range(3):
+            temp_channel = temp_x[:, :, channel]
 
-        # Extract GIST descriptors for both BBs
-        gist_outer = extract_gist_descriptor(outer_bb, gabor_filters, num_blocks)
-        gist_inner = extract_gist_descriptor(inner_bb, gabor_filters, num_blocks)
+            # Generate outer BB by removing 5 pixels
+            outer_bb = temp_channel[5:-5, 5:-5]
+            outer_bb = cv2.resize(outer_bb, image_size)
 
-        # Concatenate the GIST descriptors to form the final feature vector
-        gist_descriptor = gist_outer + gist_inner
+            # Generate inner BB by removing additional 10 pixels
+            inner_bb = outer_bb[10:-10, 10:-10]
+            inner_bb = cv2.resize(inner_bb, image_size)
 
+            # Extract GIST descriptors for both BBs
+            gist_outer = extract_gist_descriptor(outer_bb, gabor_filters, num_blocks)
+            gist_inner = extract_gist_descriptor(inner_bb, gabor_filters, num_blocks)
+
+            # Concatenate the GIST descriptors for this channel
+            gist_descriptor.extend(gist_outer + gist_inner)
+
+        # Append the final GIST descriptor for this image to the list of features
         X_features.append(gist_descriptor)
+
     return np.array(X_features)

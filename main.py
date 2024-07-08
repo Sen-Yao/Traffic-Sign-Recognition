@@ -1,6 +1,8 @@
 # main.py
 import argparse
 import time
+import os
+import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
@@ -9,6 +11,7 @@ from sklearn.decomposition import PCA
 
 from data_reader import read_ctsd_dataset, read_gtsrb_dataset
 from extractor import extract_hog_features, extract_gist_features
+from graph_embedding import graph_embedding
 
 
 def main():
@@ -42,6 +45,9 @@ def main():
     else:
         raise ValueError(f"Unsupported dataset: {args.dataset_name}")
 
+    features_dir = 'features'
+    os.makedirs(features_dir, exist_ok=True)
+
     if args.feature_extractor == 'HOG':
         print("Extracting HOG features...")
         if done_train_test_split:
@@ -52,13 +58,31 @@ def main():
     elif args.feature_extractor == 'GIST':
         print("Extracting GIST features...")
         if done_train_test_split:
-            pca = PCA(n_components=512)
-            X_train = extract_gist_features(X_train)
-            X_train = pca.fit_transform(X_train)
-            print("PCA1")
-            X_test = extract_gist_features(X_test)
-            X_test = pca.transform(X_test)
-            print("PCA2")
+            print("Extracting GIST features...")
+            train_features_path = os.path.join(features_dir, f'{args.dataset_name}_train_gist_features.pkl')
+            test_features_path = os.path.join(features_dir, f'{args.dataset_name}_test_gist_features.pkl')
+            if done_train_test_split:
+                if os.path.exists(train_features_path) and os.path.exists(test_features_path):
+                    X_train = joblib.load(train_features_path)
+                    X_test = joblib.load(test_features_path)
+                    print("Loaded precomputed GIST features.")
+                else:
+                    pca = PCA(n_components=1024)
+                    X_train = extract_gist_features(X_train)
+                    X_train = pca.fit_transform(X_train)
+                    X_test = extract_gist_features(X_test)
+                    X_test = pca.transform(X_test)
+                    joblib.dump(X_train, train_features_path)
+                    joblib.dump(X_test, test_features_path)
+            else:
+                features_path = os.path.join(features_dir, f'{args.dataset_name}_gist_features.pkl')
+                if os.path.exists(features_path):
+                    X = joblib.load(features_path)
+                    print("Loaded precomputed GIST features.")
+                else:
+                    X = extract_gist_features(X)
+                    joblib.dump(X, features_path)
+
         else:
             X = extract_gist_features(X)
     elif args.feature_extractor == 'HOG+GIST':
