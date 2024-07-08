@@ -6,7 +6,7 @@ from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score
 
 # Change the dataset_path to point to the unzipped Dataset_1/images folder in your computer.
-dataset_path = "Dataset/CTSD/images/"
+dataset_path = "Dataset/CTSD-test/images/"
 
 X = []
 y = []

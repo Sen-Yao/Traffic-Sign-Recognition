@@ -5,18 +5,23 @@ from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
+import os
+import joblib
+import torch
+import torch.nn.functional as F
+from torch_geometric.data import DataLoader
 
 from data_reader import read_ctsd_dataset, read_gtsrb_dataset
-from extractor import extract_hog_features, extract_gist_features
-
+from extractor import extract_hog_features, extract_gist_features, extract_gist_features_test
+from GNN import GCN, create_gnn_data, create_dataloader, create_gnn_data_with_progress
 
 def main():
     parser = argparse.ArgumentParser(description="Train an SVM classifier on a dataset with HOG features")
 
     # Change the dataset_path to point to the unzipped Dataset_1/images folder in your computer.
     parser.add_argument('--dataset_path', type=str, default='Dataset', help='Path to the dataset')
-    parser.add_argument('--dataset_name', type=str, default='GTSRB',  help='Name of the dataset')
-    parser.add_argument('--feature_extractor', type=str, default='GIST', help='Feature extraction method (default: hog)')
+    parser.add_argument('--dataset_name', type=str, default='CTSD',  help='Name of the dataset')
+    parser.add_argument('--feature_extractor', type=str, default='GIST-test', help='Feature extraction method (default: hog)')
     parser.add_argument('--classifier', type=str, default='svm', help='Classifier to use (default: svm)')
 
     args = parser.parse_args()
@@ -31,15 +36,22 @@ def main():
     # Train set and Test set have been split?
     done_train_test_split = False
 
-    if args.dataset_name == 'CTSD':
+    if args.dataset_name == 'GTSRB-test':
+        print("Reading GTSRB-test Dataset...")
+        X, y = read_ctsd_dataset(args.dataset_path, args.dataset_name)
+    elif args.dataset_name == 'CTSD':
         print("Reading CTSD Dataset...")
         X, y = read_ctsd_dataset(args.dataset_path, args.dataset_name)
+        print(X[0].shape)
     elif args.dataset_name == 'GTSRB':
         print("Reading GTSRB Dataset...")
         done_train_test_split = True
         X_train, X_test, y_train, y_test = read_gtsrb_dataset(args.dataset_path, args.dataset_name)
     else:
         raise ValueError(f"Unsupported dataset: {args.dataset_name}")
+
+    features_dir = 'features'
+    os.makedirs(features_dir, exist_ok=True)
 
     if args.feature_extractor == 'HOG':
         print("Extracting HOG features...")
@@ -50,11 +62,26 @@ def main():
             X = extract_hog_features(X)
     elif args.feature_extractor == 'GIST':
         print("Extracting GIST features...")
+        train_features_path = os.path.join(features_dir, f'{args.dataset_name}_train_gist_features.pkl')
+        test_features_path = os.path.join(features_dir, f'{args.dataset_name}_test_gist_features.pkl')
         if done_train_test_split:
-            X_train = extract_gist_features(X_train)
-            X_test = extract_gist_features(X_test)
+            if os.path.exists(train_features_path) and os.path.exists(test_features_path):
+                X_train = joblib.load(train_features_path)
+                X_test = joblib.load(test_features_path)
+                print("Loaded precomputed GIST features.")
+            else:
+                X_train = extract_gist_features_test(X_train)
+                X_test = extract_gist_features_test(X_test)
+                joblib.dump(X_train, train_features_path)
+                joblib.dump(X_test, test_features_path)
         else:
-            X = extract_gist_features(X)
+            features_path = os.path.join(features_dir, f'{args.dataset_name}_gist_features.pkl')
+            if os.path.exists(features_path):
+                X = joblib.load(features_path)
+                print("Loaded precomputed GIST features.")
+            else:
+                X = extract_gist_features_test(X)
+                joblib.dump(X, features_path)
     else:
         raise ValueError(f"Unsupported feature extractor: {args.feature_extractor}")
 
@@ -63,26 +90,61 @@ def main():
         # Use a 80-20 split and make sure to shuffle the samples.
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
-    # Use the sklearn SVM package to train a classifier using x_train and y_train.
     # 选择并训练分类器
     if args.classifier == 'svm':
+        # clf = SVC(kernel='linear', verbose=True)
         clf = SVC(kernel='linear')
         print("Training SVM classifier...")
     elif args.classifier == 'knn':
         clf = KNeighborsClassifier(n_neighbors=5)
         print("Training KNN classifier with k =", 5)
+    elif args.classifier == 'gnn':
+        input_dim = 1024
+        num_classes = len(set(y_train))  # number of classes
+        clf = GCN(num_features=input_dim, num_classes=num_classes)
+        print("Training GNN classifier...")
+        # Convert data to PyTorch Geometric format
+        train_data = create_gnn_data_with_progress(X_train, y_train, num_classes)
+        test_data = create_gnn_data_with_progress(X_test, y_test, num_classes)
+
+        train_loader = create_dataloader(train_data, batch_size=1)
+        test_loader = create_dataloader(test_data, batch_size=1)
+
+        optimizer = torch.optim.Adam(clf.parameters(), lr=0.01)
+        clf.train()
+
+        for epoch in range(200):
+            for data in train_loader:
+                optimizer.zero_grad()
+                out = clf(data)
+                loss = F.nll_loss(out, data.y.argmax(dim=1))
+                loss.backward()
+                optimizer.step()
+            if epoch % 10 == 0:
+                print(f'Epoch {epoch}, Loss: {loss.item()}')
+
+        clf.eval()
+        correct = 0
+        for data in test_loader:
+            out = clf(data)
+            pred = out.argmax(dim=1)
+            correct += int((pred == data.y.argmax(dim=1)).sum())
+        accuracy = correct / len(test_loader.dataset)
+        print(f"Accuracy: {accuracy * 100:.2f}%")
     else:
         raise ValueError(f"Unsupported classifier: {args.classifier}")
-    t1 = time.time()
-    print("Training start at", time.ctime(t1))
-    clf.fit(X_train, y_train)
-    print("Training time =", time.time()-t1)
-    print("Predicting...")
-    # Use the x_test and y_test to evaluate the classifier and print the accuracy value.
-    y_pred = clf.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-    print(f"Accuracy: {accuracy * 100:.2f}%")
 
+    if args.classifier != 'gnn':
+        # Traditional Machine Learning
+        train_loader, test_loader = X_train, X_test
+        t1 = time.time()
+        print("Training start at", time.ctime(t1))
+        clf.fit(train_loader, y_train)
+        print("Training time =", time.time() - t1)
+        print("Predicting...")
+        y_pred = clf.predict(X_test)
+        accuracy = accuracy_score(y_test, y_pred)
+        print(f"Accuracy: {accuracy * 100:.2f}%")
 
 if __name__ == "__main__":
     main()

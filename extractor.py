@@ -54,6 +54,7 @@ def extract_gist_features(X, orientations=8, image_size=(64, 64), num_blocks=4):
         return filtered_images
 
     def extract_gist_descriptor(img, filters, num_blocks):
+
         gabor_responses = apply_gabor_filters(img, filters)
         height, width = img.shape
         block_size = (height // num_blocks, width // num_blocks)
@@ -85,6 +86,58 @@ def extract_gist_features(X, orientations=8, image_size=(64, 64), num_blocks=4):
 
         # Concatenate the GIST descriptors to form the final feature vector
         gist_descriptor = gist_outer + gist_inner
+
+        X_features.append(gist_descriptor)
+
+    return np.array(X_features)
+
+
+def compute_power_spectrum_test(image):
+    # Convert image to float32 and compute the power spectrum in the Fourier domain
+    f = np.fft.fft2(image)
+    fshift = np.fft.fftshift(f)
+    power_spectrum = np.abs(fshift) ** 2
+    return power_spectrum
+
+
+def extract_gist_features_test(X, num_blocks=4, orientations=8, scales=4):
+    X_features = []
+
+    # Define Gabor filters
+    gabor_filters = []
+    for theta in np.linspace(0, np.pi, orientations):
+        for frequency in np.linspace(0.1, 0.4, scales):
+            gabor_filters.append(gabor_kernel(frequency, theta=theta))
+
+    def apply_gabor_filters(img, filters):
+        filtered_images = []
+        for kern in filters:
+            filtered = cv2.filter2D(img, cv2.CV_8UC3, np.real(kern))
+            filtered_images.append(filtered)
+        return filtered_images
+
+    for x in tqdm(X, desc="Extracting GIST features"):
+        # Resize images to the specified size (e.g., 64x64)
+        temp_x = cv2.resize(x, (64, 64))
+        # Convert the images to grayscale
+        temp_x = cv2.cvtColor(temp_x, cv2.COLOR_BGR2GRAY)
+
+        # Compute the power spectrum
+        power_spectrum = compute_power_spectrum_test(temp_x)
+
+        # Apply Gabor filters in the spatial domain
+        gabor_responses = apply_gabor_filters(power_spectrum, gabor_filters)
+        # Divide the image into 4x4 blocks and compute the mean response in each block
+        height, width = power_spectrum.shape
+        block_size = (height // num_blocks, width // num_blocks)
+        gist_descriptor = []
+
+        for gabor_img in gabor_responses:
+            for i in range(num_blocks):
+                for j in range(num_blocks):
+                    block = gabor_img[i * block_size[0]:(i + 1) * block_size[0],
+                            j * block_size[1]:(j + 1) * block_size[1]]
+                    gist_descriptor.append(block.mean())
 
         X_features.append(gist_descriptor)
 

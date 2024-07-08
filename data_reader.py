@@ -12,7 +12,7 @@ def read_ctsd_dataset(dataset_path, dataset_name):
 
     for i in tqdm(image_paths, desc="Reading images"):
         label = i.split("images")[1][1:4]
-        y.append(label)
+        y.append(int(str(label)))
         # read the images using opencv and append them to list X
         img = cv2.imread(i)
         X.append(img)
@@ -37,7 +37,7 @@ def read_gtsrb_dataset(dataset_path, dataset_name):
             # Read the images using OpenCV and append them to the list
             img = cv2.imread(img_path)
             train_X.append(img)
-            train_y.append(label)
+            train_y.append(int(label))
 
     # Read Test set
     test_csv_path = os.path.join(dataset_path, dataset_name, 'Test.csv')
@@ -55,6 +55,6 @@ def read_gtsrb_dataset(dataset_path, dataset_name):
 
         # Append the corresponding label from the CSV file
         label = row['ClassId']
-        test_y.append(str(label))
+        test_y.append(int(str(label)))
 
     return train_X, test_X, train_y, test_y
