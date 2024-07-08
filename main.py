@@ -10,7 +10,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.decomposition import PCA
 
 from data_reader import read_ctsd_dataset, read_gtsrb_dataset
-from extractor import extract_hog_features, extract_gist_features
+from extractor import extract_hog_features, extract_gist_features, color_histogram_extractor
 from graph_embedding import graph_embedding
 
 
@@ -20,7 +20,7 @@ def main():
     # Change the dataset_path to point to the unzipped Dataset_1/images folder in your computer.
     parser.add_argument('--dataset_path', type=str, default='Dataset', help='Path to the dataset')
     parser.add_argument('--dataset_name', type=str, default='GTSRB',  help='Name of the dataset')
-    parser.add_argument('--feature_extractor', type=str, default='GIST', help='Feature extraction method (default: hog)')
+    parser.add_argument('--feature_extractor', type=str, default='color_histogram', help='Feature extraction method (default: hog)')
     parser.add_argument('--classifier', type=str, default='svm', help='Classifier to use (default: svm)')
 
     args = parser.parse_args()
@@ -82,16 +82,36 @@ def main():
                 else:
                     X = extract_gist_features(X)
                     joblib.dump(X, features_path)
-
         else:
             X = extract_gist_features(X)
-    elif args.feature_extractor == 'HOG+GIST':
-        print("Extracting GIST features...")
+    elif args.feature_extractor == 'color_histogram':
+        print("Extracting color histogram features...")
         if done_train_test_split:
-            X_train = extract_gist_features(X_train)
-            X_test = extract_gist_features(X_test)
+            train_features_path = os.path.join(features_dir, f'{args.dataset_name}_train_color_features.pkl')
+            test_features_path = os.path.join(features_dir, f'{args.dataset_name}_test_color_features.pkl')
+            if done_train_test_split:
+                if os.path.exists(train_features_path) and os.path.exists(test_features_path):
+                    X_train = joblib.load(train_features_path)
+                    X_test = joblib.load(test_features_path)
+                    print("Loaded precomputed color features.")
+                else:
+                    pca = PCA(n_components=256)
+                    X_train = color_histogram_extractor(X_train)
+                    X_train = pca.fit_transform(X_train)
+                    X_test = color_histogram_extractor(X_test)
+                    X_test = pca.transform(X_test)
+                    joblib.dump(X_train, train_features_path)
+                    joblib.dump(X_test, test_features_path)
+            else:
+                features_path = os.path.join(features_dir, f'{args.dataset_name}_color_features.pkl')
+                if os.path.exists(features_path):
+                    X = joblib.load(features_path)
+                    print("Loaded precomputed color features.")
+                else:
+                    X = color_histogram_extractor(X)
+                    joblib.dump(X, features_path)
         else:
-            X = extract_gist_features(X)
+            X = color_histogram_extractor(X)
     else:
         raise ValueError(f"Unsupported feature extractor: {args.feature_extractor}")
 

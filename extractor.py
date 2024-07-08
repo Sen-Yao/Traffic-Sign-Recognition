@@ -7,6 +7,8 @@ from skimage.filters import gabor_kernel
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
+from color_histogram import improved_color_histogram, compute_hog_features, pca_dimension_reduction
+
 
 def extract_hog_features(X, orientations=8, pixels_per_cell=(10, 10), cells_per_block=(1, 1)):
     X_features = []
@@ -98,3 +100,19 @@ def extract_gist_features(X, orientations=8, image_size=(64, 64), num_blocks=4):
         X_features.append(gist_descriptor)
 
     return np.array(X_features)
+
+
+def color_histogram_extractor(X):
+    num_bins_r = 8
+    num_bins_g = 8
+    num_bins_b = 8
+    print("Processing the histogram")
+    hog_features = []
+    for x in tqdm(X, desc="Extracting color histogram features"):
+        x = cv2.resize(x, (48, 48))
+        color_histogram = improved_color_histogram(x, num_bins_r, num_bins_g, num_bins_b)
+        hog = compute_hog_features(x, color_histogram)
+        hog_features.append(hog.tolist())
+
+    print("hog shape", len(hog_features[0]))
+    return hog_features
