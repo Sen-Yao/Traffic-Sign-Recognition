@@ -104,16 +104,16 @@ def extract_gist_features(X, orientations=8, image_size=(64, 64), num_blocks=4):
 
 
 def color_histogram_extractor(X):
-    num_bins_r = 8
-    num_bins_g = 8
-    num_bins_b = 8
+    num_bins_r = 16
+    num_bins_g = 16
+    num_bins_b = 16
     print("Processing the histogram")
-    hog_features = []
+    color_histogram_matrix = []
     for x in tqdm(X, desc="Extracting color histogram features"):
-        x = cv2.resize(x, (48, 48))
         color_histogram = improved_color_histogram(x, num_bins_r, num_bins_g, num_bins_b)
-        hog = compute_hog_features(x, color_histogram)
-        hog_features.append(hog.tolist())
-
+        color_histogram_matrix.append(color_histogram)
+    print("Processing PCA")
+    PCA_color_histogram = pca_dimension_reduction(color_histogram_matrix, n_components=512)
+    hog_features = compute_hog_features(X, PCA_color_histogram)
     print("hog shape", len(hog_features[0]))
     return hog_features

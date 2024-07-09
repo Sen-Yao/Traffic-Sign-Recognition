@@ -107,9 +107,7 @@ def main():
                 else:
                     pca = PCA(n_components=256)
                     X_train = color_histogram_extractor(X_train)
-                    X_train = pca.fit_transform(X_train)
                     X_test = color_histogram_extractor(X_test)
-                    X_test = pca.transform(X_test)
                     joblib.dump(X_train, train_features_path)
                     joblib.dump(X_test, test_features_path)
             else:
