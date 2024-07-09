@@ -139,38 +139,7 @@ def main():
         clf = KNeighborsClassifier(n_neighbors=5)
         print("Training KNN classifier with k =", 5)
     elif args.classifier == 'gnn':
-        input_dim = 1024
-        num_classes = len(set(y_train))  # number of classes
-        clf = GCN(num_features=input_dim, num_classes=num_classes)
-        print("Training GNN classifier...")
-        # Convert data to PyTorch Geometric format
-        train_data = create_gnn_data_with_progress(X_train, y_train, num_classes)
-        test_data = create_gnn_data_with_progress(X_test, y_test, num_classes)
-
-        train_loader = create_dataloader(train_data, batch_size=1)
-        test_loader = create_dataloader(test_data, batch_size=1)
-
-        optimizer = torch.optim.Adam(clf.parameters(), lr=0.01)
-        clf.train()
-
-        for epoch in range(200):
-            for data in train_loader:
-                optimizer.zero_grad()
-                out = clf(data)
-                loss = F.nll_loss(out, data.y.argmax(dim=1))
-                loss.backward()
-                optimizer.step()
-            if epoch % 10 == 0:
-                print(f'Epoch {epoch}, Loss: {loss.item()}')
-
-        clf.eval()
-        correct = 0
-        for data in test_loader:
-            out = clf(data)
-            pred = out.argmax(dim=1)
-            correct += int((pred == data.y.argmax(dim=1)).sum())
-        accuracy = correct / len(test_loader.dataset)
-        print(f"Accuracy: {accuracy * 100:.2f}%")
+        pass
     else:
         raise ValueError(f"Unsupported classifier: {args.classifier}")
 
