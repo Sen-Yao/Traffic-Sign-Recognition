@@ -41,61 +41,60 @@ def compute_power_spectrum(image):
     return power_spectrum
 
 
+def apply_gabor_filters(img, filters):
+    filtered_images = []
+    for kern in filters:
+        filtered = cv2.filter2D(img, cv2.CV_8UC3, np.real(kern))
+        filtered_images.append(filtered)
+    return filtered_images
+
+
+def extract_gist_descriptor(img, filters, num_blocks):
+
+    gabor_responses = apply_gabor_filters(img, filters)
+    height, width = img.shape
+    block_size = (height // num_blocks, width // num_blocks)
+    gist_descriptor = []
+    for gabor_img in gabor_responses:
+        for i in range(num_blocks):
+            for j in range(num_blocks):
+                block = gabor_img[i * block_size[0]:(i + 1) * block_size[0],
+                        j * block_size[1]:(j + 1) * block_size[1]]
+                gist_descriptor.append(block.mean())
+    return gist_descriptor
+
+
 def extract_gist_features(X, orientations=8, image_size=(64, 64), num_blocks=4):
     X_features = []
-
     # Define Gabor filters
     gabor_filters = []
     for theta in np.linspace(0, np.pi, orientations):
         for frequency in [0.1, 0.2, 0.3, 0.4]:
             gabor_filters.append(gabor_kernel(frequency, theta=theta))
-
-    def apply_gabor_filters(img, filters):
-        filtered_images = []
-        for kern in filters:
-            filtered = cv2.filter2D(img, cv2.CV_8UC3, np.real(kern))
-            filtered_images.append(filtered)
-        return filtered_images
-
-    def extract_gist_descriptor(img, filters, num_blocks):
-
-        gabor_responses = apply_gabor_filters(img, filters)
-        height, width = img.shape
-        block_size = (height // num_blocks, width // num_blocks)
-        gist_descriptor = []
-        for gabor_img in gabor_responses:
-            for i in range(num_blocks):
-                for j in range(num_blocks):
-                    block = gabor_img[i * block_size[0]:(i + 1) * block_size[0],
-                            j * block_size[1]:(j + 1) * block_size[1]]
-                    gist_descriptor.append(block.mean())
-        return gist_descriptor
-
     for x in tqdm(X, desc="Extracting GIST features"):
         # Resize images to the specified size
         temp_x = cv2.resize(x, image_size)
-
+        temp_x = cv2.cvtColor(temp_x, cv2.COLOR_BGR2GRAY)
         # Initialize a list to hold GIST descriptors for all channels
         gist_descriptor = []
 
         # Process each channel separately
-        for channel in range(3):
-            temp_channel = temp_x[:, :, channel]
 
-            # Generate outer BB by removing 5 pixels
-            outer_bb = temp_channel[5:-5, 5:-5]
-            outer_bb = cv2.resize(outer_bb, image_size)
 
-            # Generate inner BB by removing additional 10 pixels
-            inner_bb = outer_bb[10:-10, 10:-10]
-            inner_bb = cv2.resize(inner_bb, image_size)
+        # Generate outer BB by removing 5 pixels
+        outer_bb = temp_x[5:-5, 5:-5]
+        outer_bb = cv2.resize(outer_bb, image_size)
 
-            # Extract GIST descriptors for both BBs
-            gist_outer = extract_gist_descriptor(outer_bb, gabor_filters, num_blocks)
-            gist_inner = extract_gist_descriptor(inner_bb, gabor_filters, num_blocks)
+        # Generate inner BB by removing additional 10 pixels
+        inner_bb = outer_bb[10:-10, 10:-10]
+        inner_bb = cv2.resize(inner_bb, image_size)
 
-            # Concatenate the GIST descriptors for this channel
-            gist_descriptor.extend(gist_outer + gist_inner)
+        # Extract GIST descriptors for both BBs
+        gist_outer = extract_gist_descriptor(outer_bb, gabor_filters, num_blocks)
+        gist_inner = extract_gist_descriptor(inner_bb, gabor_filters, num_blocks)
+
+        # Concatenate the GIST descriptors for this channel
+        gist_descriptor.extend(gist_outer + gist_inner)
 
         # Append the final GIST descriptor for this image to the list of features
         X_features.append(gist_descriptor)
@@ -108,11 +107,7 @@ def color_histogram_extractor(X):
     num_bins_g = 8
     num_bins_b = 8
     print("Processing the histogram")
-    hog_features = []
-    for x in tqdm(X, desc="Extracting color histogram features"):
-        color_histogram = improved_color_histogram(x, num_bins_r, num_bins_g, num_bins_b)
-        hog = compute_hog_features(x, color_histogram)
-        combined_feature_vector = np.concatenate((hog, color_histogram))
-        hog_features.append(combined_feature_vector.tolist())
-    print("hog shape", len(hog_features[0]))
-    return hog_features
+    color_histogram = improved_color_histogram(X, num_bins_r, num_bins_g, num_bins_b)
+    gist_features = extract_gist_features(X)
+    implement_features = np.hstack((color_histogram, gist_features))
+    return implement_features

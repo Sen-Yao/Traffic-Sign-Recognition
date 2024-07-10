@@ -105,7 +105,7 @@ def main():
                     X_test = joblib.load(test_features_path)
                     print("Loaded precomputed color features.")
                 else:
-                    pca = PCA(n_components=256)
+                    pca = PCA(n_components=512)
                     X_train = color_histogram_extractor(X_train)
                     X_train = pca.fit_transform(X_train)
                     X_test = color_histogram_extractor(X_test)

@@ -1,10 +1,11 @@
 import cv2
 import numpy as np
+from tqdm import tqdm
 from skimage.feature import hog
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-def improved_color_histogram(image, num_bins_r, num_bins_g, num_bins_b):
+def improved_color_histogram(images, num_bins_r, num_bins_g, num_bins_b):
     """
     Compute the improved color histogram feature for the given image.
 
@@ -17,31 +18,33 @@ def improved_color_histogram(image, num_bins_r, num_bins_g, num_bins_b):
     Returns:
     - feature_vector: np.ndarray, the improved color histogram feature vector.
     """
-    image = np.array(image)
-    # Ensure the image is in RGB format
-    if image.shape[2] != 3:
-        raise ValueError("Input image must be an RGB image")
+    feature_vector_list = []
+    for image in tqdm(images, desc="Extracting color histogram features"):
+        image = np.array(image)
+        # Ensure the image is in RGB format
+        if image.shape[2] != 3:
+            raise ValueError("Input image must be an RGB image")
 
-    # Compute histograms for each channel
-    hist_r = cv2.calcHist([image], [0], None, [num_bins_r], [0, 256])
-    hist_g = cv2.calcHist([image], [1], None, [num_bins_g], [0, 256])
-    hist_b = cv2.calcHist([image], [2], None, [num_bins_b], [0, 256])
+        # Compute histograms for each channel
+        hist_r = cv2.calcHist([image], [0], None, [num_bins_r], [0, 256])
+        hist_g = cv2.calcHist([image], [1], None, [num_bins_g], [0, 256])
+        hist_b = cv2.calcHist([image], [2], None, [num_bins_b], [0, 256])
 
-    # Normalize the histograms
-    hist_r /= np.sum(hist_r)
-    hist_g /= np.sum(hist_g)
-    hist_b /= np.sum(hist_b)
-    feature_vectors = []
-    for i in range(num_bins_r):
-        for j in range(num_bins_g):
-            for k in range(num_bins_b):
-                feature_vectors.append(hist_r[i] * hist_g[j] * hist_b[k])
-    # feature_vector = np.concatenate((hist_r, hist_g, hist_b)).flatten()
-    feature_vectors = np.array(feature_vectors).flatten()
-    return feature_vectors
+        # Normalize the histograms
+        hist_r /= np.sum(hist_r)
+        hist_g /= np.sum(hist_g)
+        hist_b /= np.sum(hist_b)
+        feature_vectors = []
+        for i in range(num_bins_r):
+            for j in range(num_bins_g):
+                for k in range(num_bins_b):
+                    feature_vectors.append(hist_r[i] * hist_g[j] * hist_b[k])
+        # feature_vector = np.concatenate((hist_r, hist_g, hist_b)).flatten()
+        feature_vector_list.append(np.array(feature_vectors).flatten())
+    return np.array(feature_vector_list)
 
 
-def compute_hog_features(image, feature_vector, orientations=9, pixels_per_cell=(8, 8), cells_per_block=(2, 2)):
+def compute_hog_features(image, orientations=9, pixels_per_cell=(8, 8), cells_per_block=(2, 2)):
     """
     Compute the HOG features for the given image and concatenate them with the provided feature vector.
 
