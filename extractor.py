@@ -110,10 +110,9 @@ def color_histogram_extractor(X):
     print("Processing the histogram")
     hog_features = []
     for x in tqdm(X, desc="Extracting color histogram features"):
-        x = cv2.resize(x, (48, 48))
         color_histogram = improved_color_histogram(x, num_bins_r, num_bins_g, num_bins_b)
         hog = compute_hog_features(x, color_histogram)
-        hog_features.append(hog.tolist())
-
+        combined_feature_vector = np.concatenate((hog, color_histogram))
+        hog_features.append(combined_feature_vector.tolist())
     print("hog shape", len(hog_features[0]))
     return hog_features
