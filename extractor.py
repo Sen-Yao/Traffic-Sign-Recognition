@@ -79,8 +79,6 @@ def extract_gist_features(X, orientations=8, image_size=(64, 64), num_blocks=4):
         gist_descriptor = []
 
         # Process each channel separately
-
-
         # Generate outer BB by removing 5 pixels
         outer_bb = temp_x[5:-5, 5:-5]
         outer_bb = cv2.resize(outer_bb, image_size)
