@@ -75,6 +75,7 @@ def extract_gist_features(X, orientations=8, image_size=(64, 64), num_blocks=4):
         # Resize images to the specified size
         temp_x = cv2.resize(x, image_size)
         temp_x = cv2.cvtColor(temp_x, cv2.COLOR_BGR2GRAY)
+        # temp_x = cv2.equalizeHist(temp_x)
         # Initialize a list to hold GIST descriptors for all channels
         gist_descriptor = []
 
@@ -109,3 +110,4 @@ def color_histogram_extractor(X):
     gist_features = extract_gist_features(X)
     implement_features = np.hstack((color_histogram, gist_features))
     return implement_features
+
