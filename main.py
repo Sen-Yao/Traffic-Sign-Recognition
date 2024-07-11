@@ -29,7 +29,7 @@ def main():
     parser.add_argument('--dataset_path', type=str, default='Dataset', help='Path to the dataset')
 
     parser.add_argument('--dataset_name', type=str, default='GTSRB',  help='Name of the dataset')
-    parser.add_argument('--feature_extractor', type=str, default='graph', help='Feature extraction method (default: hog)')
+    parser.add_argument('--feature_extractor', type=str, default='color_histogram', help='Feature extraction method (default: hog)')
 
     parser.add_argument('--classifier', type=str, default='mlp', help='Classifier to use (default: svm)')
 

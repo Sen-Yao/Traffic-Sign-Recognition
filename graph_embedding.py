@@ -34,7 +34,7 @@ def graph_embedding_lda(X, y):
     # Perform SVD
     U, R, Vt = np.linalg.svd(X_centered, full_matrices=False)
     V = Vt.T  # V is the right singular vectors
-    print(U.shape, W.shape, V.shape, R.shape)
+
     # Convert the problem to a smaller dimensional space
     R_inv = np.linalg.inv(np.diag(R))
     S = U.T @ W @ U
@@ -42,6 +42,10 @@ def graph_embedding_lda(X, y):
 
     # Solve the eigenproblem in the smaller space
     eigvals, eigvecs = np.linalg.eig(R_inv_S)
+
+    # Ensure results are real numbers
+    eigvals = np.real(eigvals)
+    eigvecs = np.real(eigvecs)
 
     # Sort eigenvectors by eigenvalues in descending order
     sorted_indices = np.argsort(eigvals)[::-1]
