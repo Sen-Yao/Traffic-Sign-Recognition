@@ -1,54 +1,66 @@
 import numpy as np
-from sklearn.preprocessing import StandardScaler
-from scipy.linalg import svd
 
 
-def graph_embedding(feature_matrix, labels):
+def graph_embedding_lda(X, y):
     """
-    Perform graph embedding on the feature matrix.
+    Perform LDA with graph embedding on the given dataset.
 
     Parameters:
-    - feature_matrix: List[List[float]], the input feature matrix where each row is a data sample.
-    - labels: List[int], the class labels for each data sample.
+    X (numpy.ndarray): 2D array of shape (n_samples, n_features) representing the features.
+    y (numpy.ndarray): 1D array of shape (n_samples,) representing the class labels.
 
     Returns:
-    - new_feature_matrix: np.ndarray, the transformed feature matrix.
+    numpy.ndarray: Transformed feature matrix.
     """
-    # Convert the input feature matrix to a NumPy array
-    X = np.array(feature_matrix)
-    n_samples, n_features = X.shape
+    # Ensure X and y are numpy arrays
+    X = np.asarray(X)
+    y = np.asarray(y)
 
     # Center the data
-    X_centered = StandardScaler(with_std=False).fit_transform(X)
+    X_mean = np.mean(X, axis=0)
+    X_centered = X - X_mean
 
-    # Create the weight matrix W
+    # Compute the weight matrix W
+    n_samples = X.shape[0]
     W = np.zeros((n_samples, n_samples))
-    unique_labels = np.unique(labels)
+    classes = np.unique(y)
+    for c in classes:
+        class_indices = np.where(y == c)[0]
+        n_class_samples = class_indices.size
+        for i in class_indices:
+            for j in class_indices:
+                W[i, j] = 1 / n_class_samples
 
-    for label in unique_labels:
-        indices = np.where(labels == label)[0]
-        M_l = len(indices)
-        for i in indices:
-            for j in indices:
-                if i != j:
-                    W[i, j] = 1 / M_l
+    # Perform SVD
+    U, R, Vt = np.linalg.svd(X_centered, full_matrices=False)
+    V = Vt.T  # V is the right singular vectors
 
-    # Solve the eigenproblem
-    X_centered_T = X_centered.T
-    S_b = X_centered_T @ W @ X_centered
-    S_w = X_centered_T @ X_centered
+    # Convert the problem to a smaller dimensional space
+    R_inv = np.linalg.inv(np.diag(R))
+    S = U.T @ W @ U
+    R_inv_S = R_inv @ S @ R_inv
 
-    eigenvalues, eigenvectors = np.linalg.eig(np.linalg.pinv(S_w) @ S_b)
+    # Solve the eigenproblem in the smaller space
+    eigvals, eigvecs = np.linalg.eig(R_inv_S)
+
+    # Ensure results are real numbers
+    eigvals = np.real(eigvals)
+    eigvecs = np.real(eigvecs)
 
     # Sort eigenvectors by eigenvalues in descending order
-    sorted_indices = np.argsort(eigenvalues)[::-1]
-    eigenvectors = eigenvectors[:, sorted_indices]
+    sorted_indices = np.argsort(eigvals)[::-1]
+    eigvecs = eigvecs[:, sorted_indices]
 
-    # Select the top c-1 eigenvectors (c is the number of unique classes)
-    c = len(unique_labels)
-    selected_eigenvectors = eigenvectors[:, :c - 1]
+    # Select the top c-1 eigenvectors
+    c = len(classes)
+    eigvecs = eigvecs[:, :c - 1]
 
     # Transform the data
-    new_feature_matrix = X_centered @ selected_eigenvectors
+    transformed_data = X_centered @ V @ eigvecs
 
-    return new_feature_matrix
+    return transformed_data
+
+# Example usage:
+# X = np.array([[...], [...], ...])
+# y = np.array([...])
+# transformed_X = graph_embedding_lda(X, y)

@@ -3,6 +3,12 @@ import argparse
 import time
 import os
 import joblib
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
@@ -12,7 +18,8 @@ from sklearn.decomposition import PCA
 
 from data_reader import read_ctsd_dataset, read_gtsrb_dataset
 from extractor import extract_hog_features, extract_gist_features, color_histogram_extractor
-from graph_embedding import graph_embedding
+from MLP import MLP, create_data_loaders, train, test
+from graph_embedding import graph_embedding_lda
 
 
 def main():
@@ -24,7 +31,7 @@ def main():
     parser.add_argument('--dataset_name', type=str, default='GTSRB',  help='Name of the dataset')
     parser.add_argument('--feature_extractor', type=str, default='color_histogram', help='Feature extraction method (default: hog)')
 
-    parser.add_argument('--classifier', type=str, default='svm', help='Classifier to use (default: svm)')
+    parser.add_argument('--classifier', type=str, default='mlp', help='Classifier to use (default: svm)')
 
     args = parser.parse_args()
 
@@ -38,10 +45,7 @@ def main():
     # Train set and Test set have been split?
     done_train_test_split = False
 
-    if args.dataset_name == 'GTSRB-test':
-        print("Reading GTSRB-test Dataset...")
-        X, y = read_ctsd_dataset(args.dataset_path, args.dataset_name)
-    elif args.dataset_name == 'CTSD':
+    if args.dataset_name == 'CTSD':
         print("Reading CTSD Dataset...")
         X, y = read_ctsd_dataset(args.dataset_path, args.dataset_name)
         print(X[0].shape)
@@ -64,8 +68,6 @@ def main():
             X = extract_hog_features(X)
     elif args.feature_extractor == 'GIST':
         print("Extracting GIST features...")
-        train_features_path = os.path.join(features_dir, f'{args.dataset_name}_train_gist_features.pkl')
-        test_features_path = os.path.join(features_dir, f'{args.dataset_name}_test_gist_features.pkl')
         if done_train_test_split:
 
             print("Extracting GIST features...")
@@ -97,17 +99,25 @@ def main():
     elif args.feature_extractor == 'color_histogram':
         print("Extracting color histogram features...")
         if done_train_test_split:
-            train_features_path = os.path.join(features_dir, f'{args.dataset_name}_train_color_features.pkl')
-            test_features_path = os.path.join(features_dir, f'{args.dataset_name}_test_color_features.pkl')
+            train_features_path = os.path.join(features_dir, f'{args.dataset_name}_color_train_features.pkl')
+            test_features_path = os.path.join(features_dir, f'{args.dataset_name}_color_test_features.pkl')
             if done_train_test_split:
                 if os.path.exists(train_features_path) and os.path.exists(test_features_path):
                     X_train = joblib.load(train_features_path)
                     X_test = joblib.load(test_features_path)
                     print("Loaded precomputed color features.")
                 else:
-                    pca = PCA(n_components=256)
+                    pca = PCA(n_components=512)
                     X_train = color_histogram_extractor(X_train)
+                    print('X_train:', X_train.shape)
+                    print('processing PCA on X_train')
+                    X_train = pca.fit_transform(X_train)
+                    print('X_train:', X_train.shape)
                     X_test = color_histogram_extractor(X_test)
+                    print('X_test:', X_test.shape)
+                    print('processing PCA on X_test')
+                    X_test = pca.transform(X_test)
+                    print('X_test:', X_test.shape)
                     joblib.dump(X_train, train_features_path)
                     joblib.dump(X_test, test_features_path)
             else:
@@ -120,6 +130,47 @@ def main():
                     joblib.dump(X, features_path)
         else:
             X = color_histogram_extractor(X)
+    elif args.feature_extractor == 'graph':
+        print("Extracting graph features...")
+        if done_train_test_split:
+            train_features_path = os.path.join(features_dir, f'{args.dataset_name}_graph_train_features.pkl')
+            test_features_path = os.path.join(features_dir, f'{args.dataset_name}_graph_test_features.pkl')
+            if done_train_test_split:
+                if os.path.exists(train_features_path) and os.path.exists(test_features_path):
+                    X_train = joblib.load(train_features_path)
+                    X_test = joblib.load(test_features_path)
+                    print("Loaded precomputed graph features.")
+                else:
+                    pca = PCA(n_components=512)
+                    X_train = color_histogram_extractor(X_train)
+                    print('X_train:', X_train.shape)
+                    print('processing PCA on X_train')
+                    X_train = pca.fit_transform(X_train)
+                    print('X_train:', X_train.shape, 'y_train', np.array(y_train).shape)
+                    X_train = graph_embedding_lda(X_train, np.array(y_train))
+                    print('X_train:', X_train.shape)
+                    X_test = color_histogram_extractor(X_test)
+                    print('X_test:', X_test.shape)
+                    print('processing PCA on X_test')
+                    X_test = pca.transform(X_test)
+                    print('X_test:', X_test.shape)
+                    X_test = graph_embedding_lda(X_test, y_test)
+                    print('X_test:', X_test.shape)
+                    joblib.dump(X_train, train_features_path)
+                    joblib.dump(X_test, test_features_path)
+            else:
+                features_path = os.path.join(features_dir, f'{args.dataset_name}_graph_features.pkl')
+                if os.path.exists(features_path):
+                    X = joblib.load(features_path)
+                    print("Loaded precomputed graph features.")
+                else:
+                    X = color_histogram_extractor(X)
+                    joblib.dump(X, features_path)
+                    X = graph_embedding_lda(X, y)
+        else:
+            X = color_histogram_extractor(X)
+            X = graph_embedding_lda(X, y)
+
     else:
         raise ValueError(f"Unsupported feature extractor: {args.feature_extractor}")
 
@@ -136,12 +187,28 @@ def main():
     elif args.classifier == 'knn':
         clf = KNeighborsClassifier(n_neighbors=5)
         print("Training KNN classifier with k =", 5)
-    elif args.classifier == 'gnn':
-        pass
+    elif args.classifier == 'mlp':
+        input_size = X_train.shape[1]
+        hidden_size = 128
+        output_size = len(np.unique(y_train))
+        epochs = 15
+        batch_size = 64
+        learning_rate = 0.0001
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        model = MLP(input_size, hidden_size, output_size).to(device)
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+        train_loader, test_loader = create_data_loaders(X_train, y_train, X_test, y_test, batch_size)
+
+        train(model, criterion, optimizer, train_loader, test_loader, epochs)
+        test(model, test_loader)
     else:
         raise ValueError(f"Unsupported classifier: {args.classifier}")
 
-    if args.classifier != 'gnn':
+    if args.classifier != 'mlp':
         # Traditional Machine Learning
         train_loader, test_loader = X_train, X_test
         t1 = time.time()
@@ -152,6 +219,7 @@ def main():
         y_pred = clf.predict(X_test)
         accuracy = accuracy_score(y_test, y_pred)
         print(f"Accuracy: {accuracy * 100:.2f}%")
+
 
 if __name__ == "__main__":
     main()
