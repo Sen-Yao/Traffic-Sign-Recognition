@@ -62,6 +62,19 @@ def test(model, test_loader):
     accuracy = accuracy_score(all_labels, all_preds)
     print(f"Test Accuracy: {accuracy * 100:.2f}%")
 
+    # 绘制混淆矩阵的灰度图
+    conf = confusion_matrix(all_labels, all_preds)
+    plt.imshow(conf, interpolation='nearest', cmap=plt.cm.viridis)
+    plt.title('Confusion Matrix in Color')
+    plt.colorbar()
+    tick_marks = np.arange(len(np.unique(all_labels)))
+    plt.xticks(tick_marks, rotation=45)
+    plt.yticks(tick_marks)
+    plt.xlabel('Predicted Label')
+    plt.ylabel('True Label')
+    plt.clim(0, np.max(conf) / 2)  # 专注于非对角线上的较小值
+    plt.show()
+
 def create_data_loaders(X_train, y_train, X_test, y_test, batch_size=64):
     train_dataset = torch.utils.data.TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.long))
     test_dataset = torch.utils.data.TensorDataset(torch.tensor(X_test, dtype=torch.float32), torch.tensor(y_test, dtype=torch.long))

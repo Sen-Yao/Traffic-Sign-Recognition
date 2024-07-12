@@ -31,7 +31,7 @@ def extract_hog_features(X, orientations=8, pixels_per_cell=(10, 10), cells_per_
         x_feature = hog(enhanced_img, orientations=orientations, pixels_per_cell=pixels_per_cell,
                         cells_per_block=cells_per_block, visualize=False)
         X_features.append(x_feature)
-    return X_features
+    return np.array(X_features)
 
 
 def compute_power_spectrum(image):
@@ -110,7 +110,8 @@ def color_histogram_extractor(X):
     print("Processing the histogram")
     color_histogram = improved_color_histogram(X, num_bins_r, num_bins_g, num_bins_b)
     gist_features = extract_gist_features(X)
-    implement_features = np.hstack((color_histogram, gist_features))
+    hog_features = extract_hog_features(X)
+    implement_features = np.hstack((color_histogram, gist_features, hog_features))
     return implement_features
 
 
