@@ -17,7 +17,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.decomposition import PCA
 
 from data_reader import read_ctsd_dataset, read_gtsrb_dataset
-from extractor import extract_hog_features, extract_gist_features, color_histogram_extractor
+from extractor import extract_hog_features, extract_gist_features, color_histogram_extractor, cutting_images
 from MLP import MLP, create_data_loaders, train, test
 from graph_embedding import graph_embedding_lda
 
@@ -58,8 +58,9 @@ def main():
 
     features_dir = 'features'
     os.makedirs(features_dir, exist_ok=True)
-
-    if args.feature_extractor == 'HOG':
+    if args.feature_extractor == 'none':
+        pass
+    elif args.feature_extractor == 'HOG':
         print("Extracting HOG features...")
         if done_train_test_split:
             X_train = extract_hog_features(X_train)
@@ -130,6 +131,34 @@ def main():
                     joblib.dump(X, features_path)
         else:
             X = color_histogram_extractor(X)
+            print("Extracting color histogram features...")
+            if done_train_test_split:
+                train_features_path = os.path.join(features_dir, f'{args.dataset_name}_color_train_features.pkl')
+                test_features_path = os.path.join(features_dir, f'{args.dataset_name}_color_test_features.pkl')
+    elif args.feature_extractor == 'shape':
+        X = color_histogram_extractor(X)
+        print("Extracting shape features...")
+        if done_train_test_split:
+            train_features_path = os.path.join(features_dir, f'{args.dataset_name}_shape_train_features.pkl')
+            test_features_path = os.path.join(features_dir, f'{args.dataset_name}_shape_test_features.pkl')
+            if os.path.exists(train_features_path) and os.path.exists(test_features_path):
+                X_train = joblib.load(train_features_path)
+                X_test = joblib.load(test_features_path)
+                print("Loaded precomputed features.")
+            else:
+                pca = PCA(n_components=512)
+                X_train = color_histogram_extractor(X_train)
+                print('X_train:', X_train.shape)
+                print('processing PCA on X_train')
+                X_train = pca.fit_transform(X_train)
+                print('X_train:', X_train.shape)
+                X_test = color_histogram_extractor(X_test)
+                print('X_test:', X_test.shape)
+                print('processing PCA on X_test')
+                X_test = pca.transform(X_test)
+                print('X_test:', X_test.shape)
+                joblib.dump(X_train, train_features_path)
+                joblib.dump(X_test, test_features_path)
     elif args.feature_extractor == 'graph':
         print("Extracting graph features...")
         if done_train_test_split:
@@ -205,6 +234,8 @@ def main():
 
         train(model, criterion, optimizer, train_loader, test_loader, epochs)
         test(model, test_loader)
+    elif args.classifier == 'cnn':
+        pass
     else:
         raise ValueError(f"Unsupported classifier: {args.classifier}")
 

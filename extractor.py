@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import os
 from scipy.fftpack import fft2, ifft2, fftshift
 from tqdm import tqdm
 from skimage.feature import hog
@@ -7,7 +8,7 @@ from skimage.filters import gabor_kernel
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-from color_histogram import improved_color_histogram, compute_hog_features, pca_dimension_reduction
+from color_histogram import improved_color_histogram, compute_hog_features, pca_dimension_reduction, equalize_histogram_rgb
 
 
 def extract_hog_features(X, orientations=8, pixels_per_cell=(10, 10), cells_per_block=(1, 1)):
@@ -105,9 +106,54 @@ def color_histogram_extractor(X):
     num_bins_r = 8
     num_bins_g = 8
     num_bins_b = 8
+    X = equalize_histogram_rgb(X)
     print("Processing the histogram")
     color_histogram = improved_color_histogram(X, num_bins_r, num_bins_g, num_bins_b)
     gist_features = extract_gist_features(X)
     implement_features = np.hstack((color_histogram, gist_features))
     return implement_features
 
+
+def cutting_images(image_list, save_dir='processed_images'):
+    """
+    遍历图像列表，识别每张图像中的最大bounding box，裁切图像并resize到48x48，保存处理后的图像到本地目录。
+
+    :param image_list: 输入的RGB图像列表
+    :param save_dir: 保存处理后图像的目录
+    :return: None
+    """
+    resized_images = []
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    for idx, image in enumerate(image_list):
+        # 将图像转换为灰度图像
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # 使用边缘检测识别图像中的物体轮廓
+        edges = cv2.Canny(gray, 50, 150)
+
+        # 查找轮廓
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # 初始化最大的bounding box
+        max_area = 0
+        largest_bbox = None
+
+        # 遍历所有轮廓并找到最大的bounding box
+        for contour in contours:
+            x, y, w, h = cv2.boundingRect(contour)
+            area = w * h
+            if area > max_area:
+                max_area = area
+                largest_bbox = (x, y, w, h)
+
+        # 如果找到了最大的bounding box，进行裁切和resize
+        if largest_bbox:
+            x, y, w, h = largest_bbox
+            cropped_image = image[y:y + h, x:x + w]
+            resized_image = cv2.resize(cropped_image, (48, 48))
+            save_path = os.path.join(save_dir, f'processed_image_{idx + 1}.jpg')
+            cv2.imwrite(save_path, resized_image)
+            resized_images.append(resized_image)
+    return resized_images
