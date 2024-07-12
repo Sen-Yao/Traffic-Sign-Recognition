@@ -184,9 +184,18 @@ def main():
         # clf = SVC(kernel='linear', verbose=True)
         clf = SVC(kernel='linear')
         print("Training SVM classifier...")
+    elif args.classifier == 'GaussianNB':
+        clf = GaussianNB()
+        print("Training Gaussian Naive Bayes classifier...")
     elif args.classifier == 'knn':
         clf = KNeighborsClassifier(n_neighbors=5)
         print("Training KNN classifier with k =", 5)
+    elif args.classifier == 'decision_tree':
+        clf = DecisionTreeClassifier(random_state=42)
+        print("Training Decision Tree classifier...")
+    elif args.classifier == 'random_forest':
+        clf = RandomForestClassifier(random_state=42)
+        print("Training random forest classifier...")
     elif args.classifier == 'mlp':
         input_size = X_train.shape[1]
         hidden_size = 128
@@ -220,6 +229,18 @@ def main():
         accuracy = accuracy_score(y_test, y_pred)
         print(f"Accuracy: {accuracy * 100:.2f}%")
 
+        # 绘制混淆矩阵的灰度图
+        conf = confusion_matrix(y_test, y_pred)
+        plt.imshow(conf, interpolation='nearest', cmap=plt.cm.viridis)
+        plt.title('Confusion Matrix in Color')
+        plt.colorbar()
+        tick_marks = np.arange(len(np.unique(y)))
+        plt.xticks(tick_marks, rotation=45)
+        plt.yticks(tick_marks)
+        plt.xlabel('Predicted Label')
+        plt.ylabel('True Label')
+        plt.clim(0, np.max(conf) / 2)  # 专注于非对角线上的较小值
+        plt.show()
 
 if __name__ == "__main__":
     main()
