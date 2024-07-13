@@ -27,35 +27,50 @@ def read_gtsrb_dataset(dataset_path, dataset_name):
     test_y = []
 
     # Read Train set
-    train_folder_path = os.path.join(dataset_path, dataset_name, 'Train')
-    
-    class_folders = [f for f in os.listdir(train_folder_path) if os.path.isdir(os.path.join(train_folder_path, f))]
+    train_folder_path = os.path.join(dataset_path, dataset_name)
+    train_csv_path = os.path.join(dataset_path, dataset_name, 'Train.csv')
+    train_df = pd.read_csv(train_csv_path)
 
-    for class_folder in tqdm(class_folders, desc="Reading training images"):
-        class_path = os.path.join(train_folder_path, class_folder)
-        label = class_folder
-        for img_path in glob.glob(f"{class_path}/*.png"):
-            # Read the images using OpenCV and append them to the list
-            img = cv2.imread(img_path)
-            train_X.append(img)
-            train_y.append(int(label))
+    for idx, row in tqdm(train_df.iterrows(), total=len(train_df), desc="Reading training images"):
+        # Extract image path and label
+        img_path = os.path.join(train_folder_path, row['Path'])
+        label = row['ClassId']
+
+        # Read the image using OpenCV
+        img = cv2.imread(img_path)
+
+        # Crop the image based on ROI coordinates
+        x1, y1, x2, y2 = row['Roi.X1'], row['Roi.Y1'], row['Roi.X2'], row['Roi.Y2']
+        img_cropped = img[y1:y2, x1:x2]
+
+        # Resize the image to 48x48
+        img_resized = cv2.resize(img_cropped, (48, 48))
+
+        # Append the image and label to the respective lists
+        train_X.append(img_resized)
+        train_y.append(int(label))
 
     # Read Test set
     test_csv_path = os.path.join(dataset_path, dataset_name, 'Test.csv')
     test_df = pd.read_csv(test_csv_path)
 
-    # Traverse through all png images in the Test directory
-    test_image_dir = os.path.join(dataset_path, dataset_name, 'Test')
-    test_image_paths = [os.path.join(test_image_dir, f"{index:05d}.png") for index in range(len(test_df))]
+    for idx, row in tqdm(test_df.iterrows(), total=len(test_df), desc="Reading testing images"):
+        # Extract image path and label
+        img_path = os.path.join(dataset_path, dataset_name, row['Path'])
+        label = row['ClassId']
 
-    for img_path, (index, row) in tqdm(zip(test_image_paths, test_df.iterrows()), total=len(test_df),
-                                       desc="Reading testing images"):
         # Read the image using OpenCV
         img = cv2.imread(img_path)
-        test_X.append(img)
 
-        # Append the corresponding label from the CSV file
-        label = row['ClassId']
-        test_y.append(int(str(label)))
+        # Crop the image based on ROI coordinates
+        x1, y1, x2, y2 = row['Roi.X1'], row['Roi.Y1'], row['Roi.X2'], row['Roi.Y2']
+        img_cropped = img[y1:y2, x1:x2]
+
+        # Resize the image to 48x48
+        img_resized = cv2.resize(img_cropped, (48, 48))
+
+        # Append the image and label to the respective lists
+        test_X.append(img_resized)
+        test_y.append(int(label))
 
     return train_X, test_X, train_y, test_y

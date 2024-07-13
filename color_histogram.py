@@ -5,6 +5,7 @@ from skimage.feature import hog
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
+
 def improved_color_histogram(images, num_bins_r, num_bins_g, num_bins_b):
     """
     Compute the improved color histogram feature for the given image.
@@ -94,3 +95,31 @@ def pca_dimension_reduction(feature_matrix, n_components):
     reduced_feature_matrix = pca.fit_transform(feature_matrix_standardized)
 
     return reduced_feature_matrix
+
+
+def equalize_histogram_rgb(image_list):
+    """
+    对输入的RGB图像列表的每个通道分别进行直方图均衡化，返回处理后的图像列表。
+
+    :param image_list: 输入的RGB图像列表
+    :return: 处理后的图像列表
+    """
+    equalized_images = []
+
+    for image in image_list:
+        image = cv2.resize(image, (48, 48))
+        # 分离RGB三个通道
+        r, g, b = cv2.split(image)
+
+        # 分别对R、G、B通道进行直方图均衡化
+        r_equalized = cv2.equalizeHist(r)
+        g_equalized = cv2.equalizeHist(g)
+        b_equalized = cv2.equalizeHist(b)
+
+        # 合并均衡化后的三个通道
+        equalized_image = cv2.merge([r_equalized, g_equalized, b_equalized])
+
+        # 将处理后的图像添加到结果列表中
+        equalized_images.append(equalized_image)
+
+    return equalized_images
