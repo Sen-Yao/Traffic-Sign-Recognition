@@ -7,13 +7,17 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from matplotlib import pyplot as plt
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, BaggingClassifier
 
 from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, confusion_matrix
 
 from sklearn.decomposition import PCA
+from sklearn.tree import DecisionTreeClassifier
 
 from data_reader import read_ctsd_dataset, read_gtsrb_dataset
 from extractor import extract_hog_features, extract_gist_features, color_histogram_extractor, cutting_images
@@ -30,7 +34,8 @@ def main():
     parser.add_argument('--dataset_name', type=str, default='GTSRB',  help='Name of the dataset')
     parser.add_argument('--feature_extractor', type=str, default='color_histogram', help='Feature extraction method (default: hog)')
 
-    parser.add_argument('--classifier', type=str, default='mlp', help='Classifier to use (default: svm)')
+    parser.add_argument('--classifier', type=str, default='svm', help='Classifier to use (default: svm)')
+    parser.add_argument('--ensemble', type=str, default='AdaBoost', help='Ensemble Learning to use (default: none)')
 
     args = parser.parse_args()
 
@@ -207,9 +212,10 @@ def main():
         # Use a 80-20 split and make sure to shuffle the samples.
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
+    # Default: SVM
+    clf = SVC(kernel='linear')
     # 选择并训练分类器
     if args.classifier == 'svm':
-        # clf = SVC(kernel='linear', verbose=True)
         clf = SVC(kernel='linear')
         print("Training SVM classifier...")
     elif args.classifier == 'GaussianNB':
@@ -247,6 +253,18 @@ def main():
     else:
         raise ValueError(f"Unsupported classifier: {args.classifier}")
 
+    # Start Training
+    if args.ensemble == 'none':
+        pass
+    elif args.ensemble == 'Bagging':
+        print("Using Bagging")
+        clf = BaggingClassifier(base_estimator=clf, n_estimators=10, random_state=42)
+    elif args.ensemble == "AdaBoost":
+        print("Using AdaBoost")
+        clf = AdaBoostClassifier(base_estimator=clf, n_estimators=50, random_state=42, algorithm='SAMME')
+    else:
+        raise ValueError(f"Unsupported ensemble learning: {args.ensemble}")
+    # Not using Ensemble Learning
     if args.classifier != 'mlp':
         # Traditional Machine Learning
         train_loader, test_loader = X_train, X_test
@@ -271,6 +289,7 @@ def main():
         plt.ylabel('True Label')
         plt.clim(0, np.max(conf) / 2)  # 专注于非对角线上的较小值
         plt.show()
+
 
 if __name__ == "__main__":
     main()
