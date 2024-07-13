@@ -28,6 +28,7 @@ def read_gtsrb_dataset(dataset_path, dataset_name):
 
     # Read Train set
     train_folder_path = os.path.join(dataset_path, dataset_name, 'Train')
+    
     class_folders = [f for f in os.listdir(train_folder_path) if os.path.isdir(os.path.join(train_folder_path, f))]
 
     for class_folder in tqdm(class_folders, desc="Reading training images"):
