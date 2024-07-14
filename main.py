@@ -25,10 +25,11 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 
 from sklearn.decomposition import PCA
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.utils import resample
 
 from data_reader import read_ctsd_dataset, read_gtsrb_dataset
 from extractor import extract_hog_features, extract_gist_features, color_histogram_extractor, cutting_images
-from MLP import MLP, create_data_loaders, train, test
+from MLP import MLP, create_data_loaders, train, test, test_bagging
 from graph_embedding import graph_embedding_lda
 
 
@@ -41,8 +42,8 @@ def main():
     parser.add_argument('--dataset_name', type=str, default='GTSRB',  help='Name of the dataset')
     parser.add_argument('--feature_extractor', type=str, default='color_histogram', help='Feature extraction method (default: hog)')
 
-    parser.add_argument('--classifier', type=str, default='svm', help='Classifier to use (default: svm)')
-    parser.add_argument('--ensemble', type=str, default='AdaBoost', help='Ensemble Learning to use (default: none)')
+    parser.add_argument('--classifier', type=str, default='mlp', help='Classifier to use (default: svm)')
+    parser.add_argument('--ensemble', type=str, default='Bagging', help='Ensemble Learning to use (default: none)')
 
     args = parser.parse_args()
 
@@ -238,37 +239,67 @@ def main():
         clf = RandomForestClassifier(random_state=42)
         print("Training random forest classifier...")
     elif args.classifier == 'mlp':
-        input_size = X_train.shape[1]
-        hidden_size = 128
-        output_size = len(np.unique(y_train))
-        epochs = 15
-        batch_size = 64
-        learning_rate = 0.0001
+        if args.ensemble == 'none':
+            input_size = X_train.shape[1]
+            hidden_size = 128
+            output_size = len(np.unique(y_train))
+            epochs = 15
+            batch_size = 64
+            learning_rate = 0.0001
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        model = MLP(input_size, hidden_size, output_size).to(device)
-        criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+            model = MLP(input_size, hidden_size, output_size).to(device)
+            criterion = nn.CrossEntropyLoss()
+            optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-        train_loader, test_loader = create_data_loaders(X_train, y_train, X_test, y_test, batch_size)
+            train_loader, test_loader = create_data_loaders(X_train, y_train, X_test, y_test, batch_size)
 
-        train(model, criterion, optimizer, train_loader, test_loader, epochs)
-        test(model, test_loader)
+            train(model, criterion, optimizer, train_loader, test_loader, epochs)
+            test(model, test_loader)
+        elif args.ensemble == 'Bagging':
+            input_size = X_train.shape[1]
+            hidden_size = 128
+            output_size = len(np.unique(y_train))
+            epochs = 15
+            batch_size = 64
+            learning_rate = 0.0001
+
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            n_estimators = 5
+            train_loader, test_loader = create_data_loaders(X_train, y_train, X_test, y_test, batch_size)
+            models = []
+            # Bagging for MLP
+            for _ in range(n_estimators):
+                model = MLP(input_size, hidden_size, output_size).to(device)
+                criterion = nn.CrossEntropyLoss()
+                optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+                X_resampled, y_resampled = resample(X_train, y_train)
+                train_loader_resampled = torch.utils.data.DataLoader(
+                    torch.utils.data.TensorDataset(torch.tensor(X_resampled, dtype=torch.float32),
+                                                   torch.tensor(y_resampled, dtype=torch.long)),
+                    batch_size=batch_size, shuffle=True
+                )
+                train(model, criterion, optimizer, train_loader_resampled, test_loader, epochs)
+                models.append(model)
+            test_bagging(models, test_loader)
     elif args.classifier == 'cnn':
         pass
     else:
         raise ValueError(f"Unsupported classifier: {args.classifier}")
 
     # Start Training
-    if args.ensemble == 'none':
+    if args.ensemble == 'none' or args.classifier == 'mlp':
         pass
     elif args.ensemble == 'Bagging':
-        print("Using Bagging")
-        clf = BaggingClassifier(base_estimator=clf, n_estimators=10, random_state=42)
+        if args.classifier != 'mlp':
+            print("Using Bagging")
+            clf = BaggingClassifier(base_estimator=clf, n_estimators=10, random_state=42)
+
     elif args.ensemble == "AdaBoost":
         print("Using AdaBoost")
-        clf = AdaBoostClassifier(base_estimator=clf, n_estimators=50, random_state=42, algorithm='SAMME')
+        clf = AdaBoostClassifier(base_estimator=clf, n_estimators=50, random_state=42)
     else:
         raise ValueError(f"Unsupported ensemble learning: {args.ensemble}")
     # Not using Ensemble Learning

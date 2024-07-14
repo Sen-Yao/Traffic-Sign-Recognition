@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, confusion_matrix
 import numpy as np
 import matplotlib as plt
 
@@ -82,3 +82,30 @@ def create_data_loaders(X_train, y_train, X_test, y_test, batch_size=64):
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     return train_loader, test_loader
+
+
+def test_bagging(models, test_loader):
+    all_preds = []
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    for model in models:
+        model.eval()
+        model_preds = []
+        with torch.no_grad():
+            for inputs, _ in test_loader:
+                inputs = inputs.to(device)
+                outputs = model(inputs)
+                _, preds = torch.max(outputs, 1)
+                model_preds.extend(preds.cpu().numpy())
+        all_preds.append(model_preds)
+
+    # 通过投票机制组合预测结果
+    all_preds = np.array(all_preds)
+    final_preds = np.apply_along_axis(lambda x: np.bincount(x, minlength=len(np.unique(all_preds))).argmax(), axis=0, arr=all_preds)
+
+    # 计算并打印Bagging模型的准确率
+    all_labels = []
+    for _, labels in test_loader:
+        all_labels.extend(labels.numpy())
+    accuracy = accuracy_score(all_labels, final_preds)
+    print(f"Bagging Test Accuracy: {accuracy * 100:.2f}%")
