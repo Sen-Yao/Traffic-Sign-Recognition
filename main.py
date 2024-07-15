@@ -161,7 +161,7 @@ def main():
                     reshape_X_test = cnn_preprocess(X_test)
                     cnn_model = CNN(num_classes=len(np.unique(y_train)))
                     batch_size = 64
-                    epochs = 1
+                    epochs = 8
                     learning_rate = 0.001
                     train_loader = cnn_create_data_loaders(reshape_X_train, y_train, batch_size)
                     test_loader = cnn_create_data_loaders(reshape_X_test, y_test, batch_size)

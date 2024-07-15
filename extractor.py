@@ -132,8 +132,12 @@ def extract_CNN_features(X, model):
             transforms.Normalize(mean=[0.5], std=[0.5])  # 归一化
         ])
         image = transform(image)
-        feature = model(image)
+        model.eval()
+        with torch.no_grad():
+            feature = model(image)
+        feature = feature.cpu().numpy()
         features.append(feature)
+    features = np.concatenate(features, axis=0)
     return features
 
 def color_histogram_CNN_extractor(X, model):
@@ -147,7 +151,7 @@ def color_histogram_CNN_extractor(X, model):
     hog_features = extract_hog_features(X)
     cnn_features = extract_CNN_features(X, model)
     print(len(cnn_features), len(cnn_features[0]))
-    implement_features = np.hstack((color_histogram, gist_features, hog_features, np.array(cnn_features)))
+    implement_features = np.hstack((color_histogram, gist_features, hog_features))
     return implement_features
 
 
