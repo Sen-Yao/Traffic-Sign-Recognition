@@ -5,8 +5,10 @@ import os
 import joblib
 import numpy as np
 import torch
+import cv2
 import torch.nn as nn
 import torch.optim as optim
+from torchvision import transforms
 from matplotlib import pyplot as plt
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, BaggingClassifier
 
@@ -28,9 +30,10 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.utils import resample
 
 from data_reader import read_ctsd_dataset, read_gtsrb_dataset
-from extractor import extract_hog_features, extract_gist_features, color_histogram_extractor, cutting_images
+from extractor import extract_hog_features, extract_gist_features, color_histogram_extractor, color_histogram_CNN_extractor, cnn_preprocess
 from MLP import MLP, create_data_loaders, train, test, test_bagging
 from graph_embedding import graph_embedding_lda
+from CNN import CNN, cnn_train, cnn_create_data_loaders
 
 
 def main():
@@ -40,9 +43,9 @@ def main():
     parser.add_argument('--dataset_path', type=str, default='Dataset', help='Path to the dataset')
 
     parser.add_argument('--dataset_name', type=str, default='GTSRB',  help='Name of the dataset')
-    parser.add_argument('--feature_extractor', type=str, default='color_histogram', help='Feature extraction method (default: hog)')
+    parser.add_argument('--feature_extractor', type=str, default='color_histogram_cnn', help='Feature extraction method (default: hog)')
 
-    parser.add_argument('--classifier', type=str, default='mlp', help='Classifier to use (default: svm)')
+    parser.add_argument('--classifier', type=str, default='svm', help='Classifier to use (default: svm)')
     parser.add_argument('--ensemble', type=str, default='Bagging', help='Ensemble Learning to use (default: none)')
 
     args = parser.parse_args()
@@ -141,12 +144,52 @@ def main():
                 else:
                     X = color_histogram_extractor(X)
                     joblib.dump(X, features_path)
-        else:
-            X = color_histogram_extractor(X)
-            print("Extracting color histogram features...")
+    elif args.feature_extractor == 'color_histogram_cnn':
+        print("Extracting color histogram with CNN features...")
+        if done_train_test_split:
+            train_features_path = os.path.join(features_dir, f'{args.dataset_name}_color-cnn_train_features.pkl')
+            test_features_path = os.path.join(features_dir, f'{args.dataset_name}_color-cnn_test_features.pkl')
             if done_train_test_split:
-                train_features_path = os.path.join(features_dir, f'{args.dataset_name}_color_train_features.pkl')
-                test_features_path = os.path.join(features_dir, f'{args.dataset_name}_color_test_features.pkl')
+                if os.path.exists(train_features_path) and os.path.exists(test_features_path):
+                    X_train = joblib.load(train_features_path)
+                    X_test = joblib.load(test_features_path)
+                    print("Loaded precomputed color features.")
+                else:
+                    pca = PCA(n_components=512)
+                    print("Start Training CNN")
+                    reshape_X_train = cnn_preprocess(X_train)
+                    reshape_X_test = cnn_preprocess(X_test)
+                    cnn_model = CNN(num_classes=len(np.unique(y_train)))
+                    batch_size = 64
+                    epochs = 1
+                    learning_rate = 0.001
+                    train_loader = cnn_create_data_loaders(reshape_X_train, y_train, batch_size)
+                    test_loader = cnn_create_data_loaders(reshape_X_test, y_test, batch_size)
+                    criterion = nn.CrossEntropyLoss()
+                    optimizer = optim.Adam(cnn_model.parameters(), lr=learning_rate)
+                    cnn_train(cnn_model, criterion, optimizer, train_loader, test_loader, epochs)
+                    print("Start Extracting CNN features")
+                    X_train = color_histogram_CNN_extractor(X_train, cnn_model)
+                    print('X_train:', X_train.shape)
+                    print('processing PCA on X_train')
+                    X_train = pca.fit_transform(X_train)
+                    print('X_train:', X_train.shape)
+                    X_test = color_histogram_CNN_extractor(X_test, cnn_model)
+                    print('X_test:', X_test.shape)
+                    print('processing PCA on X_test')
+                    X_test = pca.transform(X_test)
+                    print('X_test:', X_test.shape)
+                    joblib.dump(X_train, train_features_path)
+                    joblib.dump(X_test, test_features_path)
+            else:
+                features_path = os.path.join(features_dir, f'{args.dataset_name}_color_features.pkl')
+                if os.path.exists(features_path):
+                    X = joblib.load(features_path)
+                    print("Loaded precomputed color features.")
+                else:
+                    X = color_histogram_extractor(X)
+                    joblib.dump(X, features_path)
+
     elif args.feature_extractor == 'shape':
         X = color_histogram_extractor(X)
         print("Extracting shape features...")
@@ -284,8 +327,6 @@ def main():
                 train(model, criterion, optimizer, train_loader_resampled, test_loader, epochs)
                 models.append(model)
             test_bagging(models, test_loader)
-    elif args.classifier == 'cnn':
-        pass
     else:
         raise ValueError(f"Unsupported classifier: {args.classifier}")
 
