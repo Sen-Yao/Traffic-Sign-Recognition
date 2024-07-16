@@ -168,16 +168,15 @@ def main():
                     criterion = nn.CrossEntropyLoss()
                     optimizer = optim.Adam(cnn_model.parameters(), lr=learning_rate)
                     cnn_train(cnn_model, criterion, optimizer, train_loader, test_loader, epochs)
+
+                    color_pca = PCA(n_components=4)
+                    hog_pca = PCA(n_components=64)
+                    gist_pca = PCA(n_components=64)
+                    cnn_pca = PCA(n_components=32)
                     print("Start Extracting CNN features")
-                    X_train = color_histogram_CNN_extractor(X_train, cnn_model)
+                    X_train = color_histogram_CNN_extractor(X_train, cnn_model, color_pca=color_pca, hog_pca=hog_pca, gist_pca=gist_pca, cnn_pca=cnn_pca, train=True)
                     print('X_train:', X_train.shape)
-                    print('processing PCA on X_train')
-                    X_train = pca.fit_transform(X_train)
-                    print('X_train:', X_train.shape)
-                    X_test = color_histogram_CNN_extractor(X_test, cnn_model)
-                    print('X_test:', X_test.shape)
-                    print('processing PCA on X_test')
-                    X_test = pca.transform(X_test)
+                    X_test = color_histogram_CNN_extractor(X_test, cnn_model, color_pca=color_pca, hog_pca=hog_pca, gist_pca=gist_pca, cnn_pca=cnn_pca, train=False)
                     print('X_test:', X_test.shape)
                     joblib.dump(X_train, train_features_path)
                     joblib.dump(X_test, test_features_path)
@@ -201,16 +200,13 @@ def main():
                 X_test = joblib.load(test_features_path)
                 print("Loaded precomputed features.")
             else:
-                pca = PCA(n_components=512)
+                color_pca = PCA(n_components=4)
+                hog_pca = PCA(n_components=64)
+                gist_pca = PCA(n_components=64)
+                cnn_pca = PCA(n_components=64)
                 X_train = color_histogram_extractor(X_train)
                 print('X_train:', X_train.shape)
-                print('processing PCA on X_train')
-                X_train = pca.fit_transform(X_train)
-                print('X_train:', X_train.shape)
                 X_test = color_histogram_extractor(X_test)
-                print('X_test:', X_test.shape)
-                print('processing PCA on X_test')
-                X_test = pca.transform(X_test)
                 print('X_test:', X_test.shape)
                 joblib.dump(X_train, train_features_path)
                 joblib.dump(X_test, test_features_path)
@@ -336,11 +332,11 @@ def main():
     elif args.ensemble == 'Bagging':
         if args.classifier != 'mlp':
             print("Using Bagging")
-            clf = BaggingClassifier(base_estimator=clf, n_estimators=10, random_state=42)
+            clf = BaggingClassifier(estimator=clf, n_estimators=10, random_state=42)
 
     elif args.ensemble == "AdaBoost":
         print("Using AdaBoost")
-        clf = AdaBoostClassifier(base_estimator=clf, n_estimators=50, random_state=42)
+        clf = AdaBoostClassifier(estimator=clf, n_estimators=50, random_state=42)
     else:
         raise ValueError(f"Unsupported ensemble learning: {args.ensemble}")
     # Not using Ensemble Learning

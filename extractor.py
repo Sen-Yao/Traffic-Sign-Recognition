@@ -14,7 +14,7 @@ from sklearn.preprocessing import StandardScaler
 from color_histogram import improved_color_histogram, compute_hog_features, pca_dimension_reduction, equalize_histogram_rgb
 
 
-def extract_hog_features(X, orientations=8, pixels_per_cell=(10, 10), cells_per_block=(1, 1)):
+def extract_hog_features(X, orientations=8, pixels_per_cell=(10, 10), cells_per_block=(1, 1), pca=None, train=False):
     X_features = []
     for x in X:
         # resize them to 48x48 pixels.
@@ -34,6 +34,10 @@ def extract_hog_features(X, orientations=8, pixels_per_cell=(10, 10), cells_per_
         x_feature = hog(enhanced_img, orientations=orientations, pixels_per_cell=pixels_per_cell,
                         cells_per_block=cells_per_block, visualize=False)
         X_features.append(x_feature)
+    if train:
+        X_features = pca.fit_transform(X_features)
+    else:
+        X_features = pca.transform(X_features)
     return np.array(X_features)
 
 
@@ -68,7 +72,7 @@ def extract_gist_descriptor(img, filters, num_blocks):
     return gist_descriptor
 
 
-def extract_gist_features(X, orientations=8, image_size=(64, 64), num_blocks=4):
+def extract_gist_features(X, orientations=8, image_size=(64, 64), num_blocks=4, pca=None, train=False):
     X_features = []
     # Define Gabor filters
     gabor_filters = []
@@ -101,7 +105,10 @@ def extract_gist_features(X, orientations=8, image_size=(64, 64), num_blocks=4):
 
         # Append the final GIST descriptor for this image to the list of features
         X_features.append(gist_descriptor)
-
+    if train:
+        X_features = pca.fit_transform(X_features)
+    else:
+        X_features = pca.transform(X_features)
     return np.array(X_features)
 
 
@@ -118,7 +125,7 @@ def color_histogram_extractor(X):
     return implement_features
 
 
-def extract_CNN_features(X, model):
+def extract_CNN_features(X, model, pca=None, train=False):
     features = []
     for image in tqdm(X, desc="Extracting CNN features"):
         image = image[15:-15, 15:-15]
@@ -138,20 +145,26 @@ def extract_CNN_features(X, model):
         feature = feature.cpu().numpy()
         features.append(feature)
     features = np.concatenate(features, axis=0)
+    if train:
+        features = pca.fit_transform(features)
+    else:
+        features = pca.transform(features)
     return features
 
-def color_histogram_CNN_extractor(X, model):
+
+def color_histogram_CNN_extractor(X, model, color_pca=None, hog_pca=None, gist_pca=None, cnn_pca=None, train=False):
     num_bins_r = 8
     num_bins_g = 8
     num_bins_b = 8
     X = equalize_histogram_rgb(X)
     print("Processing the histogram")
-    color_histogram = improved_color_histogram(X, num_bins_r, num_bins_g, num_bins_b)
-    gist_features = extract_gist_features(X)
-    hog_features = extract_hog_features(X)
-    cnn_features = extract_CNN_features(X, model)
+    color_histogram = improved_color_histogram(X, num_bins_r, num_bins_g, num_bins_b, pca=color_pca, train=train)
+    gist_features = extract_gist_features(X, pca=gist_pca, train=train)
+    hog_features = extract_hog_features(X, pca=hog_pca, train=train)
+    cnn_features = extract_CNN_features(X, model, pca=cnn_pca, train=train)
     print(len(cnn_features), len(cnn_features[0]))
-    implement_features = np.hstack((color_histogram, gist_features, hog_features))
+
+    implement_features = np.hstack((color_histogram, gist_features, hog_features, cnn_features))
     return implement_features
 
 

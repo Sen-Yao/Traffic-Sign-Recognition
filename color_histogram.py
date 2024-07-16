@@ -6,7 +6,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
 
-def improved_color_histogram(images, num_bins_r, num_bins_g, num_bins_b):
+def improved_color_histogram(images, num_bins_r, num_bins_g, num_bins_b, pca=None, train=False):
     """
     Compute the improved color histogram feature for the given image.
 
@@ -42,6 +42,11 @@ def improved_color_histogram(images, num_bins_r, num_bins_g, num_bins_b):
                     feature_vectors.append(hist_r[i] * hist_g[j] * hist_b[k])
         # feature_vector = np.concatenate((hist_r, hist_g, hist_b)).flatten()
         feature_vector_list.append(np.array(feature_vectors).flatten())
+    feature_vector_list = np.array(feature_vector_list)
+    if train:
+        feature_vector_list = pca.fit_transform(feature_vector_list)
+    else:
+        feature_vector_list = pca.transform(feature_vector_list)
     return np.array(feature_vector_list)
 
 
