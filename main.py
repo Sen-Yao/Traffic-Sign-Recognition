@@ -47,7 +47,7 @@ def main():
     parser.add_argument('--dataset_name', type=str, default='GTSRB',  help='Name of the dataset')
     parser.add_argument('--feature_extractor', type=str, default='color_histogram_cnn', help='Feature extraction method (default: hog)')
 
-    parser.add_argument('--classifier', type=str, default='svm', help='Classifier to use (default: svm)')
+    parser.add_argument('--classifier', type=str, default='mlp', help='Classifier to use (default: svm)')
     parser.add_argument('--ensemble', type=str, default='Bagging', help='Ensemble Learning to use (default: none)')
 
     args = parser.parse_args()
@@ -310,9 +310,9 @@ def main():
             test(model, test_loader)
         elif args.ensemble == 'Bagging':
             input_size = X_train.shape[1]
-            hidden_size = 128
+            hidden_size = 512
             output_size = len(np.unique(y_train))
-            epochs = 15
+            epochs = 5
             batch_size = 64
             learning_rate = 0.0001
 
