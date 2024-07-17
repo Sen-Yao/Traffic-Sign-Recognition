@@ -2,6 +2,8 @@
 import argparse
 import time
 import os
+from collections import defaultdict
+
 import joblib
 import numpy as np
 import torch
@@ -149,30 +151,44 @@ def main():
         if done_train_test_split:
             train_features_path = os.path.join(features_dir, f'{args.dataset_name}_color-cnn_train_features.pkl')
             test_features_path = os.path.join(features_dir, f'{args.dataset_name}_color-cnn_test_features.pkl')
+            cnn_model_features_path = os.path.join(features_dir, f'{args.dataset_name}_color-cnn_model.pkl')
             if done_train_test_split:
                 if os.path.exists(train_features_path) and os.path.exists(test_features_path):
                     X_train = joblib.load(train_features_path)
                     X_test = joblib.load(test_features_path)
                     print("Loaded precomputed color features.")
                 else:
-                    pca = PCA(n_components=512)
-                    print("Start Training CNN")
-                    reshape_X_train = cnn_preprocess(X_train)
-                    reshape_X_test = cnn_preprocess(X_test)
-                    cnn_model = CNN(num_classes=len(np.unique(y_train)))
-                    batch_size = 64
-                    epochs = 8
-                    learning_rate = 0.001
-                    train_loader = cnn_create_data_loaders(reshape_X_train, y_train, batch_size)
-                    test_loader = cnn_create_data_loaders(reshape_X_test, y_test, batch_size)
-                    criterion = nn.CrossEntropyLoss()
-                    optimizer = optim.Adam(cnn_model.parameters(), lr=learning_rate)
-                    cnn_train(cnn_model, criterion, optimizer, train_loader, test_loader, epochs)
+                    input_width_and_height = 48 - 2 * 8
+                    if os.path.exists(cnn_model_features_path):
+                        cnn_model = CNN(input_width_and_height, input_width_and_height, num_classes=len(np.unique(y_train)))
+                        cnn_model.load_state_dict(torch.load(cnn_model_features_path))
+                        cnn_model.eval()
+                        print("Loaded pre-trained CNN model")
+                    else:
+                        print("Start Training CNN")
+                        reshape_X_train = cnn_preprocess(X_train)
+                        reshape_X_test = cnn_preprocess(X_test)
 
-                    color_pca = PCA(n_components=4)
+                        cnn_model = CNN(input_width_and_height, input_width_and_height, num_classes=len(np.unique(y_train)))
+                        batch_size = 64
+                        epochs = 5
+                        learning_rate = 0.001
+                        train_loader = cnn_create_data_loaders(reshape_X_train, y_train, batch_size)
+                        test_loader = cnn_create_data_loaders(reshape_X_test, y_test, batch_size)
+                        criterion = nn.CrossEntropyLoss()
+                        optimizer = optim.Adam(cnn_model.parameters(), lr=learning_rate)
+
+                        # 训练模型
+                        cnn_train(cnn_model, criterion, optimizer, train_loader, test_loader, epochs)
+
+                        # 保存模型
+                        torch.save(cnn_model.state_dict(), cnn_model_features_path)
+                        print(f"CNN model saved to {cnn_model_features_path}")
+
+                    color_pca = PCA(n_components=64)
                     hog_pca = PCA(n_components=64)
                     gist_pca = PCA(n_components=64)
-                    cnn_pca = PCA(n_components=32)
+                    cnn_pca = PCA(n_components=64)
                     print("Start Extracting CNN features")
                     X_train = color_histogram_CNN_extractor(X_train, cnn_model, color_pca=color_pca, hog_pca=hog_pca, gist_pca=gist_pca, cnn_pca=cnn_pca, train=True)
                     print('X_train:', X_train.shape)
@@ -200,10 +216,6 @@ def main():
                 X_test = joblib.load(test_features_path)
                 print("Loaded precomputed features.")
             else:
-                color_pca = PCA(n_components=4)
-                hog_pca = PCA(n_components=64)
-                gist_pca = PCA(n_components=64)
-                cnn_pca = PCA(n_components=64)
                 X_train = color_histogram_extractor(X_train)
                 print('X_train:', X_train.shape)
                 X_test = color_histogram_extractor(X_test)
@@ -352,19 +364,18 @@ def main():
         accuracy = accuracy_score(y_test, y_pred)
         print(f"Accuracy: {accuracy * 100:.2f}%")
 
-        # 绘制混淆矩阵的灰度图
-        conf = confusion_matrix(y_test, y_pred)
-        plt.imshow(conf, interpolation='nearest', cmap=plt.cm.viridis)
-        plt.title('Confusion Matrix in Color')
-        plt.colorbar()
-        tick_marks = np.arange(len(np.unique(y)))
-        plt.xticks(tick_marks, rotation=45)
-        plt.yticks(tick_marks)
-        plt.xlabel('Predicted Label')
-        plt.ylabel('True Label')
-        plt.clim(0, np.max(conf) / 2)  # 专注于非对角线上的较小值
-        plt.show()
+        # 统计并打印分类错误的测试集图片
+        error_stats = defaultdict(int)
+        for i in range(len(y_test)):
+            if y_test[i] != y_pred[i]:
+                print(f"Image {i}: True label = {y_test[i]}, Predicted label = {y_pred[i]}")
+                error_stats[(y_test[i], y_pred[i])] += 1
 
+        # 按降序排列并打印误分类情况
+        sorted_error_stats = sorted(error_stats.items(), key=lambda item: item[1], reverse=True)
+        print("\nMisclassification counts (sorted):")
+        for (true_label, pred_label), count in sorted_error_stats:
+            print(f"True label {true_label} was misclassified as {pred_label}: {count} times")
 
 if __name__ == "__main__":
     main()

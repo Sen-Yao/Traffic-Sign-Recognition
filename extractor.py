@@ -125,10 +125,11 @@ def color_histogram_extractor(X):
     return implement_features
 
 
-def extract_CNN_features(X, model, pca=None, train=False):
-    features = []
-    for image in tqdm(X, desc="Extracting CNN features"):
-        image = image[15:-15, 15:-15]
+def extract_CNN_features(X, model, batch_size=64, pca=None, train=False):
+    # 预处理所有图片
+    preprocessed_images = []
+    for image in tqdm(X, desc="Preprocessing images"):
+        image = image[8:-8, 8:-8]
 
         # 将图片从BGR转换为灰度
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -139,11 +140,19 @@ def extract_CNN_features(X, model, pca=None, train=False):
             transforms.Normalize(mean=[0.5], std=[0.5])  # 归一化
         ])
         image = transform(image)
-        model.eval()
-        with torch.no_grad():
-            feature = model(image)
-        feature = feature.cpu().numpy()
-        features.append(feature)
+        preprocessed_images.append(image)
+
+    preprocessed_images = torch.stack(preprocessed_images)  # 拼接成一个张量
+
+    # 分批次输入模型进行特征提取
+    features = []
+    model.eval()
+    with torch.no_grad():
+        for i in tqdm(range(0, len(preprocessed_images), batch_size), desc="Extracting CNN features"):
+            batch_images = preprocessed_images[i:i + batch_size]
+            batch_features = model(batch_images, True)
+            features.append(batch_features.cpu().numpy())
+
     features = np.concatenate(features, axis=0)
     if train:
         features = pca.fit_transform(features)
@@ -152,16 +161,17 @@ def extract_CNN_features(X, model, pca=None, train=False):
     return features
 
 
+
 def color_histogram_CNN_extractor(X, model, color_pca=None, hog_pca=None, gist_pca=None, cnn_pca=None, train=False):
     num_bins_r = 8
     num_bins_g = 8
     num_bins_b = 8
     X = equalize_histogram_rgb(X)
     print("Processing the histogram")
+    cnn_features = extract_CNN_features(X, model, pca=cnn_pca, train=train)
     color_histogram = improved_color_histogram(X, num_bins_r, num_bins_g, num_bins_b, pca=color_pca, train=train)
     gist_features = extract_gist_features(X, pca=gist_pca, train=train)
     hog_features = extract_hog_features(X, pca=hog_pca, train=train)
-    cnn_features = extract_CNN_features(X, model, pca=cnn_pca, train=train)
     print(len(cnn_features), len(cnn_features[0]))
 
     implement_features = np.hstack((color_histogram, gist_features, hog_features, cnn_features))
@@ -171,7 +181,7 @@ def color_histogram_CNN_extractor(X, model, color_pca=None, hog_pca=None, gist_p
 def cnn_preprocess(X):
     X_tensors = []
     for image in X:
-        image = image[15:-15, 15:-15]
+        image = image[8:-8, 8:-8]
 
         # 将图片从BGR转换为灰度
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
