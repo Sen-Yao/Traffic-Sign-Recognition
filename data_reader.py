@@ -15,6 +15,7 @@ def read_ctsd_dataset(dataset_path, dataset_name):
         y.append(int(str(label)))
         # read the images using opencv and append them to list X
         img = cv2.imread(i)
+        img = cv2.resize(img, (48, 48))
         X.append(img)
 
     return X, y

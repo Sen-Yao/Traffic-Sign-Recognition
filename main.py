@@ -44,11 +44,11 @@ def main():
     # Change the dataset_path to point to the unzipped Dataset_1/images folder in your computer.
     parser.add_argument('--dataset_path', type=str, default='Dataset', help='Path to the dataset')
 
-    parser.add_argument('--dataset_name', type=str, default='GTSRB',  help='Name of the dataset')
+    parser.add_argument('--dataset_name', type=str, default='CTSD',  help='Name of the dataset')
     parser.add_argument('--feature_extractor', type=str, default='color_histogram_cnn', help='Feature extraction method (default: hog)')
 
     parser.add_argument('--classifier', type=str, default='svm', help='Classifier to use (default: svm)')
-    parser.add_argument('--ensemble', type=str, default='none', help='Ensemble Learning to use (default: none)')
+    parser.add_argument('--ensemble', type=str, default='Bagging', help='Ensemble Learning to use (default: none)')
 
     args = parser.parse_args()
 
@@ -148,6 +148,9 @@ def main():
                     X = color_histogram_extractor(X)
                     joblib.dump(X, features_path)
     elif args.feature_extractor == 'color_histogram_cnn':
+        if not done_train_test_split:
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
+            done_train_test_split = True
         print("Extracting color histogram with CNN features...")
         if done_train_test_split:
             train_features_path = os.path.join(features_dir, f'{args.dataset_name}_color-cnn_train_features.pkl')
@@ -198,13 +201,53 @@ def main():
                     joblib.dump(X_train, train_features_path)
                     joblib.dump(X_test, test_features_path)
             else:
-                features_path = os.path.join(features_dir, f'{args.dataset_name}_color_features.pkl')
-                if os.path.exists(features_path):
-                    X = joblib.load(features_path)
+                if os.path.exists(train_features_path) and os.path.exists(test_features_path):
+                    X_train = joblib.load(train_features_path)
+                    X_test = joblib.load(test_features_path)
                     print("Loaded precomputed color features.")
                 else:
-                    X = color_histogram_extractor(X)
-                    joblib.dump(X, features_path)
+                    input_width_and_height = 48 - 2 * 8
+                    if os.path.exists(cnn_model_features_path):
+                        cnn_model = CNN(input_width_and_height, input_width_and_height,
+                                        num_classes=len(np.unique(y_train)))
+                        cnn_model.load_state_dict(torch.load(cnn_model_features_path))
+                        cnn_model.eval()
+                        print("Loaded pre-trained CNN model")
+                    else:
+                        print("Start Training CNN")
+                        reshape_X_train = cnn_preprocess(X_train)
+                        reshape_X_test = cnn_preprocess(X_test)
+
+                        cnn_model = CNN(input_width_and_height, input_width_and_height,
+                                        num_classes=len(np.unique(y_train)))
+                        batch_size = 64
+                        epochs = 5
+                        learning_rate = 0.001
+                        train_loader = cnn_create_data_loaders(reshape_X_train, y_train, batch_size)
+                        test_loader = cnn_create_data_loaders(reshape_X_test, y_test, batch_size)
+                        criterion = nn.CrossEntropyLoss()
+                        optimizer = optim.Adam(cnn_model.parameters(), lr=learning_rate)
+
+                        # 训练模型
+                        cnn_train(cnn_model, criterion, optimizer, train_loader, test_loader, epochs)
+
+                        # 保存模型
+                        torch.save(cnn_model.state_dict(), cnn_model_features_path)
+                        print(f"CNN model saved to {cnn_model_features_path}")
+
+                    color_pca = PCA(n_components=32)
+                    hog_pca = PCA(n_components=64)
+                    gist_pca = PCA(n_components=64)
+                    cnn_pca = PCA(n_components=256)
+                    print("Start Extracting CNN features")
+                    X_train = color_histogram_CNN_extractor(X_train, cnn_model, color_pca=color_pca, hog_pca=hog_pca,
+                                                            gist_pca=gist_pca, cnn_pca=cnn_pca, train=True)
+                    print('X_train:', X_train.shape)
+                    X_test = color_histogram_CNN_extractor(X_test, cnn_model, color_pca=color_pca, hog_pca=hog_pca,
+                                                           gist_pca=gist_pca, cnn_pca=cnn_pca, train=False)
+                    print('X_test:', X_test.shape)
+                    joblib.dump(X_train, train_features_path)
+                    joblib.dump(X_test, test_features_path)
 
     elif args.feature_extractor == 'shape':
         X = color_histogram_extractor(X)
