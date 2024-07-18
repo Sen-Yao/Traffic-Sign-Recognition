@@ -112,15 +112,16 @@ def extract_gist_features(X, orientations=8, image_size=(64, 64), num_blocks=4, 
     return np.array(X_features)
 
 
-def color_histogram_extractor(X):
+def color_histogram_extractor(X,  color_pca=None, hog_pca=None, gist_pca=None, cnn_pca=None, train=False):
     num_bins_r = 8
     num_bins_g = 8
     num_bins_b = 8
     X = equalize_histogram_rgb(X)
     print("Processing the histogram")
-    color_histogram = improved_color_histogram(X, num_bins_r, num_bins_g, num_bins_b)
-    gist_features = extract_gist_features(X)
-    hog_features = extract_hog_features(X)
+    color_histogram = improved_color_histogram(X, num_bins_r, num_bins_g, num_bins_b, pca=color_pca, train=train)
+    gist_features = extract_gist_features(X, pca=gist_pca, train=train)
+    hog_features = extract_hog_features(X, pca=hog_pca, train=train)
+
     implement_features = np.hstack((color_histogram, gist_features, hog_features))
     return implement_features
 

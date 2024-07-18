@@ -47,8 +47,8 @@ def main():
     parser.add_argument('--dataset_name', type=str, default='GTSRB',  help='Name of the dataset')
     parser.add_argument('--feature_extractor', type=str, default='color_histogram_cnn', help='Feature extraction method (default: hog)')
 
-    parser.add_argument('--classifier', type=str, default='mlp', help='Classifier to use (default: svm)')
-    parser.add_argument('--ensemble', type=str, default='Bagging', help='Ensemble Learning to use (default: none)')
+    parser.add_argument('--classifier', type=str, default='svm', help='Classifier to use (default: svm)')
+    parser.add_argument('--ensemble', type=str, default='none', help='Ensemble Learning to use (default: none)')
 
     args = parser.parse_args()
 
@@ -119,22 +119,23 @@ def main():
         if done_train_test_split:
             train_features_path = os.path.join(features_dir, f'{args.dataset_name}_color_train_features.pkl')
             test_features_path = os.path.join(features_dir, f'{args.dataset_name}_color_test_features.pkl')
+            cnn_model_features_path = os.path.join(features_dir, f'{args.dataset_name}_color_model.pkl')
             if done_train_test_split:
                 if os.path.exists(train_features_path) and os.path.exists(test_features_path):
                     X_train = joblib.load(train_features_path)
                     X_test = joblib.load(test_features_path)
                     print("Loaded precomputed color features.")
                 else:
-                    pca = PCA(n_components=512)
-                    X_train = color_histogram_extractor(X_train)
+
+                    color_pca = PCA(n_components=32)
+                    hog_pca = PCA(n_components=64)
+                    gist_pca = PCA(n_components=64)
+                    print("Start Extracting CNN features")
+                    X_train = color_histogram_extractor(X_train, color_pca=color_pca, hog_pca=hog_pca,
+                                                            gist_pca=gist_pca, train=True)
                     print('X_train:', X_train.shape)
-                    print('processing PCA on X_train')
-                    X_train = pca.fit_transform(X_train)
-                    print('X_train:', X_train.shape)
-                    X_test = color_histogram_extractor(X_test)
-                    print('X_test:', X_test.shape)
-                    print('processing PCA on X_test')
-                    X_test = pca.transform(X_test)
+                    X_test = color_histogram_extractor(X_test, color_pca=color_pca, hog_pca=hog_pca,
+                                                           gist_pca=gist_pca, train=False)
                     print('X_test:', X_test.shape)
                     joblib.dump(X_train, train_features_path)
                     joblib.dump(X_test, test_features_path)
@@ -187,7 +188,7 @@ def main():
 
                     color_pca = PCA(n_components=32)
                     hog_pca = PCA(n_components=64)
-                    gist_pca = PCA(n_components=32)
+                    gist_pca = PCA(n_components=64)
                     cnn_pca = PCA(n_components=256)
                     print("Start Extracting CNN features")
                     X_train = color_histogram_CNN_extractor(X_train, cnn_model, color_pca=color_pca, hog_pca=hog_pca, gist_pca=gist_pca, cnn_pca=cnn_pca, train=True)
@@ -294,7 +295,7 @@ def main():
             input_size = X_train.shape[1]
             hidden_size = 128
             output_size = len(np.unique(y_train))
-            epochs = 15
+            epochs = 8
             batch_size = 64
             learning_rate = 0.0001
 
@@ -310,9 +311,9 @@ def main():
             test(model, test_loader)
         elif args.ensemble == 'Bagging':
             input_size = X_train.shape[1]
-            hidden_size = 512
+            hidden_size = 128
             output_size = len(np.unique(y_train))
-            epochs = 5
+            epochs = 8
             batch_size = 64
             learning_rate = 0.0001
 

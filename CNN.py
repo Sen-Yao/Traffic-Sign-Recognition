@@ -17,8 +17,8 @@ class CNN(nn.Module):
         conv_output_width = input_width // 4  # 宽度减半两次
         self.fc1_input_size = 64 * conv_output_height * conv_output_width
 
-        self.fc1 = nn.Linear(self.fc1_input_size, 256)
-        self.fc2 = nn.Linear(256, num_classes)
+        self.fc1 = nn.Linear(self.fc1_input_size, 512)
+        self.fc2 = nn.Linear(512, num_classes)
 
     def forward(self, x, feature=False):
         x = F.relu(self.conv1(x))
