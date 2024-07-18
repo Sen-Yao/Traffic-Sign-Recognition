@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -109,3 +111,19 @@ def test_bagging(models, test_loader):
         all_labels.extend(labels.numpy())
     accuracy = accuracy_score(all_labels, final_preds)
     print(f"Bagging Test Accuracy: {accuracy * 100:.2f}%")
+    # 统计误分类情况
+
+    confusion = confusion_matrix(all_labels, final_preds)
+    misclassifications = defaultdict(int)
+
+    for true_label, predicted_label in zip(all_labels, final_preds):
+        if true_label != predicted_label:
+            misclassifications[(true_label, predicted_label)] += 1
+
+    # 按降序排列误分类情况
+    sorted_misclassifications = sorted(misclassifications.items(), key=lambda item: item[1], reverse=True)
+
+    # 打印误分类情况
+    print("\nMisclassification counts (sorted):")
+    for (true_label, predicted_label), count in sorted_misclassifications:
+        print(f"True label {true_label} was misclassified as {predicted_label}: {count} times")

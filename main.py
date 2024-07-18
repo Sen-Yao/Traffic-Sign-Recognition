@@ -185,10 +185,10 @@ def main():
                         torch.save(cnn_model.state_dict(), cnn_model_features_path)
                         print(f"CNN model saved to {cnn_model_features_path}")
 
-                    color_pca = PCA(n_components=64)
+                    color_pca = PCA(n_components=32)
                     hog_pca = PCA(n_components=64)
-                    gist_pca = PCA(n_components=64)
-                    cnn_pca = PCA(n_components=64)
+                    gist_pca = PCA(n_components=32)
+                    cnn_pca = PCA(n_components=256)
                     print("Start Extracting CNN features")
                     X_train = color_histogram_CNN_extractor(X_train, cnn_model, color_pca=color_pca, hog_pca=hog_pca, gist_pca=gist_pca, cnn_pca=cnn_pca, train=True)
                     print('X_train:', X_train.shape)
